@@ -6,9 +6,9 @@
   NODE_VERSION = "18"
 
 [context.production.environment]
-  SUPABASE_URL = "https://your-project.supabase.co"
-  SUPABASE_ANON_KEY = "your-anon-key"
-  SUPABASE_SERVICE_KEY = "your-service-key"
+  SUPABASE_URL = "https://revdnghkdjfxuxiqjddk.supabase.co"
+  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4"
+  SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Nzc2OTMxNywiZXhwIjoyMDgzMzQ1MzE3fQ.Ege9ONtBDc3pIf4v6pZ8w2a9VfMZOiJ_Qlv85JqYYg4"
   NODE_ENV = "production"
 
 [context.deploy-preview.environment]
