@@ -1,11 +1,6 @@
-// Authentication functions
-// Get supabase from global scope
-const supabase = window.supabaseClient;
-
 // Check if supabase is available
-if (!supabase || !supabase.auth) {
+if (!window.supabaseClient || !window.supabaseClient.auth) {
     console.error('Supabase is not properly initialized. Make sure supabase.js is loaded first.');
-    
     // Create a minimal dummy supabase object to prevent errors
     window.supabaseClient = {
         auth: {
@@ -37,19 +32,21 @@ if (!supabase || !supabase.auth) {
         })
     };
 }
+
 class AuthManager {
     constructor() {
         this.currentUser = null;
+        this.supabase = window.supabaseClient; // Store reference here
         this.init();
     }
 
     async init() {
         // Check existing session
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await this.supabase.auth.getSession();
         this.currentUser = session?.user || null;
         
         // Listen for auth changes
-        supabase.auth.onAuthStateChange((event, session) => {
+        this.supabase.auth.onAuthStateChange((event, session) => {
             this.currentUser = session?.user || null;
             this.updateAuthUI();
             
@@ -65,7 +62,7 @@ class AuthManager {
     // Sign up new user
     async signUp(email, password, name) {
         try {
-            const { data, error } = await supabase.auth.signUp({
+            const { data, error } = await this.supabase.auth.signUp({
                 email,
                 password,
                 options: {
@@ -75,14 +72,14 @@ class AuthManager {
                     }
                 }
             });
-
+            
             if (error) throw error;
-
+            
             // Create user profile in database
             if (data.user) {
                 await this.createUserProfile(data.user, name);
             }
-
+            
             return { success: true, data };
         } catch (error) {
             console.error('Sign up error:', error);
@@ -92,7 +89,7 @@ class AuthManager {
 
     // Create user profile
     async createUserProfile(user, name) {
-        const { error } = await supabase
+        const { error } = await this.supabase
             .from('users')
             .insert([
                 {
@@ -105,7 +102,7 @@ class AuthManager {
                     journal_entries: 0
                 }
             ]);
-
+            
         if (error) {
             console.error('Profile creation error:', error);
         }
@@ -114,13 +111,12 @@ class AuthManager {
     // Sign in user
     async signIn(email, password) {
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await this.supabase.auth.signInWithPassword({
                 email,
                 password
             });
-
+            
             if (error) throw error;
-
             return { success: true, data };
         } catch (error) {
             console.error('Sign in error:', error);
@@ -131,9 +127,8 @@ class AuthManager {
     // Sign out user
     async signOut() {
         try {
-            const { error } = await supabase.auth.signOut();
+            const { error } = await this.supabase.auth.signOut();
             if (error) throw error;
-            
             window.location.href = '../index.html';
         } catch (error) {
             console.error('Sign out error:', error);
@@ -143,12 +138,11 @@ class AuthManager {
     // Reset password
     async resetPassword(email) {
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: `${window.location.origin}/pages/reset-password.html`,
             });
-
+            
             if (error) throw error;
-
             return { success: true };
         } catch (error) {
             console.error('Reset password error:', error);
@@ -159,12 +153,11 @@ class AuthManager {
     // Update password
     async updatePassword(newPassword) {
         try {
-            const { error } = await supabase.auth.updateUser({
+            const { error } = await this.supabase.auth.updateUser({
                 password: newPassword
             });
-
+            
             if (error) throw error;
-
             return { success: true };
         } catch (error) {
             console.error('Update password error:', error);
@@ -176,14 +169,13 @@ class AuthManager {
     async isAdmin() {
         if (!this.currentUser) return false;
         
-        const { data, error } = await supabase
+        const { data, error } = await this.supabase
             .from('users')
             .select('role')
             .eq('id', this.currentUser.id)
             .single();
-
+            
         if (error || !data) return false;
-        
         return data.role === 'admin';
     }
 
@@ -191,17 +183,16 @@ class AuthManager {
     async getUserData() {
         if (!this.currentUser) return null;
         
-        const { data, error } = await supabase
+        const { data, error } = await this.supabase
             .from('users')
             .select('*')
             .eq('id', this.currentUser.id)
             .single();
-
+            
         if (error) {
             console.error('Get user data error:', error);
             return null;
         }
-
         return data;
     }
 
@@ -210,7 +201,7 @@ class AuthManager {
         const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
         const logoutBtn = document.getElementById('logout-btn');
         const userStatus = document.getElementById('user-status');
-
+        
         if (this.currentUser) {
             if (loginBtn) loginBtn.style.display = 'none';
             if (logoutBtn) logoutBtn.style.display = 'inline-block';
@@ -247,16 +238,16 @@ class AuthManager {
         // Remove existing messages
         const existing = document.querySelector('.auth-message');
         if (existing) existing.remove();
-
+        
         // Create message element
         const messageDiv = document.createElement('div');
         messageDiv.className = `auth-message ${type}-message fade-in`;
         messageDiv.textContent = message;
-
+        
         // Add to DOM
         const authContainer = document.querySelector('.auth-container') || document.body;
         authContainer.prepend(messageDiv);
-
+        
         // Auto remove after 5 seconds
         setTimeout(() => {
             if (messageDiv.parentNode) {
@@ -274,7 +265,7 @@ window.auth = auth;
 
 // Helper function to check auth state
 async function checkAuthState() {
-    const { data } = await supabase.auth.getSession();
+    const { data } = await window.supabaseClient.auth.getSession();
     auth.currentUser = data.session?.user || null;
     auth.updateAuthUI();
     return auth.currentUser;
@@ -286,7 +277,7 @@ async function loadUserData() {
         window.location.href = '../index.html';
         return;
     }
-
+    
     const userData = await auth.getUserData();
     if (userData) {
         // Update dashboard with user data
@@ -294,7 +285,7 @@ async function loadUserData() {
         userNameElements.forEach(el => {
             el.textContent = userData.name || userData.email.split('@')[0];
         });
-
+        
         document.getElementById('user-email').textContent = userData.email;
         
         // Update avatar with initials
@@ -303,7 +294,7 @@ async function loadUserData() {
             const initials = userData.name.split(' ').map(n => n[0]).join('').toUpperCase();
             avatar.textContent = initials;
         }
-
+        
         // Update stats
         document.getElementById('meditation-streak').textContent = userData.meditation_streak || 0;
         document.getElementById('total-meditations').textContent = userData.total_meditations || 0;
@@ -331,13 +322,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', logout);
     }
-
+    
     // Logout button on dashboard
     const dashboardLogout = document.getElementById('dashboard-logout');
     if (dashboardLogout) {
         dashboardLogout.addEventListener('click', logout);
     }
-
+    
     // Admin logout button
     const adminLogout = document.getElementById('admin-logout');
     if (adminLogout) {
