@@ -13,28 +13,24 @@ class I18nManager {
     }
 
     async loadTranslations() {
-        // Try to load from localStorage first
-        const cached = localStorage.getItem(`translations_${this.currentLang}`);
-        if (cached) {
-            this.translations = JSON.parse(cached);
-            return;
+    // Always use embedded translations to avoid fetch errors
+    this.translations = this.getEmbeddedTranslations();
+    console.log(`Loaded embedded translations for ${this.currentLang}`);
+    
+    // Optional: Try to fetch from server, but don't fail if it doesn't exist
+    try {
+        const response = await fetch(`translations/${this.currentLang}.json`);
+        if (response.ok) {
+            const serverTranslations = await response.json();
+            // Merge with embedded translations
+            this.translations = { ...this.translations, ...serverTranslations };
+            console.log(`Merged server translations for ${this.currentLang}`);
         }
-
-        // Load from external file or API
-        try {
-            const response = await fetch(`/translations/${this.currentLang}.json`);
-            if (response.ok) {
-                this.translations = await response.json();
-                localStorage.setItem(`translations_${this.currentLang}`, JSON.stringify(this.translations));
-            } else {
-                // Fallback to embedded translations
-                this.translations = this.getEmbeddedTranslations();
-            }
-        } catch (error) {
-            console.error('Failed to load translations:', error);
-            this.translations = this.getEmbeddedTranslations();
-        }
+    } catch (error) {
+        // Silently fail - we already have embedded translations
+        console.log(`Using embedded translations for ${this.currentLang}`);
     }
+}
 
     getEmbeddedTranslations() {
         // Embedded translations for English and Arabic

@@ -1,28 +1,41 @@
 // Authentication functions
+// Get supabase from global scope
+const supabase = window.supabaseClient;
+
 // Check if supabase is available
-if (typeof supabase === 'undefined') {
-    console.error('Supabase is not defined. Make sure supabase.js is loaded first.');
-    // Try to get from window object
-    if (window.supabaseClient) {
-        var supabase = window.supabaseClient;
-    } else {
-        // Create a dummy supabase object to prevent further errors
-        var supabase = {
-            auth: {
-                getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-                signUp: () => Promise.reject(new Error('Supabase not initialized')),
-                signInWithPassword: () => Promise.reject(new Error('Supabase not initialized')),
-                signOut: () => Promise.reject(new Error('Supabase not initialized')),
-                resetPasswordForEmail: () => Promise.reject(new Error('Supabase not initialized')),
-                updateUser: () => Promise.reject(new Error('Supabase not initialized'))
-            },
-            from: () => ({
-                insert: () => ({ select: () => ({ single: () => Promise.reject(new Error('Supabase not initialized')) }) }),
-                select: () => ({ eq: () => ({ single: () => Promise.reject(new Error('Supabase not initialized')) }) }),
-                update: () => ({ eq: () => Promise.reject(new Error('Supabase not initialized')) })
+if (!supabase || !supabase.auth) {
+    console.error('Supabase is not properly initialized. Make sure supabase.js is loaded first.');
+    
+    // Create a minimal dummy supabase object to prevent errors
+    window.supabaseClient = {
+        auth: {
+            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+            signUp: () => Promise.reject(new Error('Supabase not initialized')),
+            signInWithPassword: () => Promise.reject(new Error('Supabase not initialized')),
+            signOut: () => Promise.reject(new Error('Supabase not initialized')),
+            resetPasswordForEmail: () => Promise.reject(new Error('Supabase not initialized')),
+            updateUser: () => Promise.reject(new Error('Supabase not initialized')),
+            onAuthStateChange: (callback) => {
+                console.warn('Auth state change listener registered but Supabase not initialized');
+                return { data: { subscription: { unsubscribe: () => {} } } };
+            }
+        },
+        from: () => ({
+            insert: () => ({ 
+                select: () => ({ 
+                    single: () => Promise.reject(new Error('Supabase not initialized')) 
+                }) 
+            }),
+            select: () => ({ 
+                eq: () => ({ 
+                    single: () => Promise.reject(new Error('Supabase not initialized')) 
+                }) 
+            }),
+            update: () => ({ 
+                eq: () => Promise.reject(new Error('Supabase not initialized')) 
             })
-        };
-    }
+        })
+    };
 }
 class AuthManager {
     constructor() {
