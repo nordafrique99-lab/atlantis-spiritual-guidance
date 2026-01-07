@@ -1,3 +1,4 @@
+// Authentication functions
 // Check if supabase is available
 if (!window.supabaseClient || !window.supabaseClient.auth) {
     console.error('Supabase is not properly initialized. Make sure supabase.js is loaded first.');
@@ -61,31 +62,71 @@ class AuthManager {
 
     // Sign up new user
     async signUp(email, password, name) {
-        try {
-            const { data, error } = await this.supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        name: name,
-                        created_at: new Date().toISOString()
-                    }
-                }
-            });
-            
-            if (error) throw error;
-            
-            // Create user profile in database
-            if (data.user) {
-                await this.createUserProfile(data.user, name);
+    try {
+        const { data, error } = await this.supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    name: name,
+                    created_at: new Date().toISOString()
+                },
+                emailRedirectTo: `${window.location.origin}/pages/login.html`
             }
-            
-            return { success: true, data };
-        } catch (error) {
-            console.error('Sign up error:', error);
-            return { success: false, error: error.message };
+        });
+        
+        if (error) throw error;
+        
+        // IMPORTANT: Wait a moment for auth to fully register
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Now create user profile - but check if we're authenticated first
+        if (data.user) {
+            await this.createUserProfile(data.user, name);
         }
+        
+        return { success: true, data };
+    } catch (error) {
+        console.error('Sign up error:', error);
+        return { success: false, error: error.message };
     }
+}
+
+// Also update createUserProfile:
+async createUserProfile(user, name) {
+    try {
+        // Get the current session to ensure we have a token
+        const { data: { session } } = await this.supabase.auth.getSession();
+        
+        if (!session) {
+            console.error('No session found, cannot create profile');
+            return;
+        }
+        
+        const { error } = await this.supabase
+            .from('users')
+            .insert([
+                {
+                    id: user.id,
+                    email: user.email,
+                    name: name,
+                    created_at: new Date().toISOString(),
+                    meditation_streak: 0,
+                    total_meditations: 0,
+                    journal_entries: 0,
+                    role: 'user'
+                }
+            ]);
+            
+        if (error) {
+            console.error('Profile creation error:', error);
+            // Don't throw, just log - the user can still use the app
+            // They can complete profile setup later
+        }
+    } catch (error) {
+        console.error('Error in createUserProfile:', error);
+    }
+}
 
     // Create user profile
     async createUserProfile(user, name) {
