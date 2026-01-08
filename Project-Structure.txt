@@ -1498,7 +1498,8 @@ footer {
 ```javascript
 // Supabase configuration
 const SUPABASE_URL = 'https://revdnghkdjfxuxiqjddk.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 
+  (typeof window !== 'undefined' ? window.SUPABASE_ANON_KEY : '');
 // Initialize Supabase client only once
 if (!window.supabaseClient) {
     // Check if supabase library is loaded
@@ -1554,203 +1555,94 @@ if (!window.supabaseClient) {
 ### 7. **js/auth.js**
 ```javascript
 // Authentication functions
-// Check if supabase is available
 if (!window.supabaseClient || !window.supabaseClient.auth) {
-    console.error('Supabase is not properly initialized. Make sure supabase.js is loaded first.');
-    // Create a minimal dummy supabase object to prevent errors
-    window.supabaseClient = {
-        auth: {
-            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-            signUp: () => Promise.reject(new Error('Supabase not initialized')),
-            signInWithPassword: () => Promise.reject(new Error('Supabase not initialized')),
-            signOut: () => Promise.reject(new Error('Supabase not initialized')),
-            resetPasswordForEmail: () => Promise.reject(new Error('Supabase not initialized')),
-            updateUser: () => Promise.reject(new Error('Supabase not initialized')),
-            onAuthStateChange: (callback) => {
-                console.warn('Auth state change listener registered but Supabase not initialized');
-                return { data: { subscription: { unsubscribe: () => {} } } };
-            }
-        },
-        from: () => ({
-            insert: () => ({ 
-                select: () => ({ 
-                    single: () => Promise.reject(new Error('Supabase not initialized')) 
-                }) 
-            }),
-            select: () => ({ 
-                eq: () => ({ 
-                    single: () => Promise.reject(new Error('Supabase not initialized')) 
-                }) 
-            }),
-            update: () => ({ 
-                eq: () => Promise.reject(new Error('Supabase not initialized')) 
-            })
-        })
-    };
+    console.error('Supabase is not properly initialized.');
 }
-
 class AuthManager {
     constructor() {
         this.currentUser = null;
-        this.supabase = window.supabaseClient; // Store reference here
+        this.supabase = window.supabaseClient;
         this.init();
     }
-
     async init() {
         // Check existing session
         const { data: { session } } = await this.supabase.auth.getSession();
         this.currentUser = session?.user || null;
-        
         // Listen for auth changes
         this.supabase.auth.onAuthStateChange((event, session) => {
             this.currentUser = session?.user || null;
             this.updateAuthUI();
-            
             if (event === 'SIGNED_IN') {
-                this.showSuccessMessage('Welcome back!');
-                window.location.href = 'pages/dashboard.html';
+                this.showSuccessMessage('Welcome!');
+                // Redirect to dashboard if we're on login page
+                if (window.location.pathname.includes('login.html')) {
+                    setTimeout(() => {
+                        window.location.href = '../pages/dashboard.html';
+                    }, 1000);
+                }
             } else if (event === 'SIGNED_OUT') {
                 this.showInfoMessage('Successfully logged out');
             }
         });
+        // Initial UI update
+        this.updateAuthUI();
     }
-
-    // Sign up new user
+    // Sign up new user - NO EMAIL CONFIRMATION NEEDED
     async signUp(email, password, name) {
-    try {
-        console.log('Starting signup for:', email);
-        
-        // First, sign up with Supabase Auth
-        const { data, error } = await this.supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    name: name,
-                    created_at: new Date().toISOString()
-                },
-                // Use Netlify URL if available, otherwise localhost for testing
-                emailRedirectTo: window.location.hostname.includes('netlify.app') 
-                    ? `${window.location.origin}/pages/login.html`
-                    : 'http://localhost:8888/pages/login.html'
+        try {
+            console.log('Starting signup for:', email);
+            // Sign up with Supabase Auth WITHOUT email confirmation
+            const { data, error } = await this.supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        name: name,
+                        created_at: new Date().toISOString()
+                    }
+                    // REMOVED emailRedirectTo - no confirmation needed
+                }
+            });
+            if (error) {
+                console.error('Auth signup error:', error);
+                throw error;
             }
-        });
-        
-        if (error) {
-            console.error('Auth signup error:', error);
-            throw error;
-        }
-        
-        console.log('Auth signup successful, user:', data.user);
-        
-        // IMPORTANT: Sign in immediately after signup to get session
-        const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
-            email,
-            password
-        });
-        
-        if (signInError) {
-            console.error('Auto signin error:', signInError);
-            // Continue anyway - user can verify email later
-        } else {
+            console.log('Auth signup successful, user:', data.user);
+            // Auto sign in after signup
+            const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            if (signInError) {
+                console.error('Auto signin error:', signInError);
+                return { 
+                    success: false, 
+                    error: signInError.message 
+                };
+            }
             console.log('Auto signin successful');
             this.currentUser = signInData.user;
+            return { 
+                success: true, 
+                data: signInData,
+                message: 'Account created successfully!'
+            };
+        } catch (error) {
+            console.error('Sign up error:', error);
+            return { 
+                success: false, 
+                error: error.message,
+                code: error.code
+            };
         }
-        
-        // Create user profile - but only if we have a session
-        if (data.user) {
-            await this.createUserProfile(data.user, name);
-        }
-        
-        return { 
-            success: true, 
-            data,
-            message: data.user?.identities?.length === 0 
-                ? 'Please check your email to confirm your account before logging in.'
-                : 'Account created successfully!'
-        };
-    } catch (error) {
-        console.error('Sign up error:', error);
-        return { 
-            success: false, 
-            error: error.message,
-            code: error.code
-        };
     }
-}
-
-async createUserProfile(user, name) {
-    try {
-        console.log('Creating user profile for:', user.id);
-        
-        // Get current session to ensure we have a token
-        const { data: { session } } = await this.supabase.auth.getSession();
-        
-        if (!session) {
-            console.log('No session found, waiting for auth state...');
-            // Wait a bit and try again
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            const { data: { session: retrySession } } = await this.supabase.auth.getSession();
-            if (!retrySession) {
-                console.warn('Still no session after waiting. User may need to confirm email first.');
-                return;
-            }
-        }
-        
-        // Try to insert the user profile
-        const { data, error } = await this.supabase
-            .from('users')
-            .insert([
-                {
-                    id: user.id,
-                    email: user.email,
-                    name: name,
-                    created_at: new Date().toISOString(),
-                    meditation_streak: 0,
-                    total_meditations: 0,
-                    journal_entries: 0,
-                    role: 'user'
-                }
-            ])
-            .select();  // Add .select() to get feedback
-            
-        if (error) {
-            console.error('Profile creation error details:', error);
-            
-            // If it's a duplicate key error, that's okay - profile already exists
-            if (error.code === '23505') {
-                console.log('User profile already exists, that\'s fine');
-                return;
-            }
-            
-            // For RLS errors, we might need to use a different approach
-            if (error.code === '42501') {
-                console.warn('RLS policy prevented insertion. This may be okay if user needs to confirm email first.');
-                // Schedule a retry for later
-                setTimeout(() => this.createUserProfile(user, name), 5000);
-                return;
-            }
-            
-            throw error;
-        }
-        
-        console.log('Profile created successfully:', data);
-    } catch (error) {
-        console.error('Error in createUserProfile:', error);
-        // Don't throw - let signup continue even if profile creation fails
-        // The user can complete profile setup later
-    }
-}
-
-    // Sign in user
+    // Sign in user (no changes needed)
     async signIn(email, password) {
         try {
             const { data, error } = await this.supabase.auth.signInWithPassword({
                 email,
                 password
             });
-            
             if (error) throw error;
             return { success: true, data };
         } catch (error) {
@@ -1758,25 +1650,28 @@ async createUserProfile(user, name) {
             return { success: false, error: error.message };
         }
     }
-
     // Sign out user
     async signOut() {
         try {
             const { error } = await this.supabase.auth.signOut();
             if (error) throw error;
-            window.location.href = '../index.html';
+            // Redirect based on current page
+            if (window.location.pathname.includes('dashboard.html') || 
+                window.location.pathname.includes('admin.html')) {
+                window.location.href = '../index.html';
+            } else {
+                window.location.reload();
+            }
         } catch (error) {
             console.error('Sign out error:', error);
         }
     }
-
     // Reset password
     async resetPassword(email) {
         try {
             const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: `${window.location.origin}/pages/reset-password.html`,
             });
-            
             if (error) throw error;
             return { success: true };
         } catch (error) {
@@ -1784,59 +1679,77 @@ async createUserProfile(user, name) {
             return { success: false, error: error.message };
         }
     }
-
-    // Update password
-    async updatePassword(newPassword) {
-        try {
-            const { error } = await this.supabase.auth.updateUser({
-                password: newPassword
-            });
-            
-            if (error) throw error;
-            return { success: true };
-        } catch (error) {
-            console.error('Update password error:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
     // Check if user is admin
     async isAdmin() {
         if (!this.currentUser) return false;
-        
-        const { data, error } = await this.supabase
-            .from('users')
-            .select('role')
-            .eq('id', this.currentUser.id)
-            .single();
-            
-        if (error || !data) return false;
-        return data.role === 'admin';
+        try {
+            const { data, error } = await this.supabase
+                .from('users')
+                .select('role')
+                .eq('id', this.currentUser.id)
+                .single();
+            if (error || !data) return false;
+            return data.role === 'admin';
+        } catch (error) {
+            console.error('Admin check error:', error);
+            return false;
+        }
     }
-
     // Get user data
     async getUserData() {
         if (!this.currentUser) return null;
-        
-        const { data, error } = await this.supabase
-            .from('users')
-            .select('*')
-            .eq('id', this.currentUser.id)
-            .single();
-            
-        if (error) {
+        try {
+            const { data, error } = await this.supabase
+                .from('users')
+                .select('*')
+                .eq('id', this.currentUser.id)
+                .single();
+            if (error) {
+                // If user doesn't exist in users table, create it
+                console.log('Creating user profile...');
+                await this.createUserProfile(this.currentUser);
+                return {
+                    id: this.currentUser.id,
+                    email: this.currentUser.email,
+                    name: this.currentUser.user_metadata?.name || this.currentUser.email.split('@')[0],
+                    role: 'user',
+                    meditation_streak: 0,
+                    total_meditations: 0,
+                    journal_entries: 0
+                };
+            }
+            return data;
+        } catch (error) {
             console.error('Get user data error:', error);
             return null;
         }
-        return data;
     }
-
-    // Update auth UI based on state
+    // Create user profile if missing
+    async createUserProfile(user) {
+        try {
+            const { error } = await this.supabase
+                .from('users')
+                .insert([
+                    {
+                        id: user.id,
+                        email: user.email,
+                        name: user.user_metadata?.name || user.email.split('@')[0],
+                        created_at: new Date().toISOString(),
+                        role: 'user'
+                    }
+                ]);
+            if (error && error.code !== '23505') { // Ignore duplicate key errors
+                console.error('Profile creation error:', error);
+            }
+        } catch (error) {
+            console.error('Error creating profile:', error);
+        }
+    }
+    // Update auth UI
     updateAuthUI() {
         const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
         const logoutBtn = document.getElementById('logout-btn');
         const userStatus = document.getElementById('user-status');
-        
         if (this.currentUser) {
             if (loginBtn) loginBtn.style.display = 'none';
             if (logoutBtn) logoutBtn.style.display = 'inline-block';
@@ -1847,43 +1760,28 @@ async createUserProfile(user, name) {
             if (loginBtn) loginBtn.style.display = 'inline-block';
             if (logoutBtn) logoutBtn.style.display = 'none';
             if (userStatus) {
-                userStatus.innerHTML = `<p data-i18n="guest_message">You are browsing as a guest. <a href="pages/login.html" data-i18n="login_link">Login</a> for personalized guidance.</p>`;
-                i18n.updatePage();
+                userStatus.innerHTML = `<p>You are browsing as a guest. <a href="pages/login.html">Login</a> for personalized guidance.</p>`;
             }
         }
     }
-
-    // Show success message
+    // Show message functions (keep as is)
     showSuccessMessage(message) {
         this.showMessage(message, 'success');
     }
-
-    // Show error message
     showErrorMessage(message) {
         this.showMessage(message, 'error');
     }
-
-    // Show info message
     showInfoMessage(message) {
         this.showMessage(message, 'info');
     }
-
-    // Show message
     showMessage(message, type = 'info') {
-        // Remove existing messages
         const existing = document.querySelector('.auth-message');
         if (existing) existing.remove();
-        
-        // Create message element
         const messageDiv = document.createElement('div');
         messageDiv.className = `auth-message ${type}-message fade-in`;
         messageDiv.textContent = message;
-        
-        // Add to DOM
         const authContainer = document.querySelector('.auth-container') || document.body;
         authContainer.prepend(messageDiv);
-        
-        // Auto remove after 5 seconds
         setTimeout(() => {
             if (messageDiv.parentNode) {
                 messageDiv.remove();
@@ -1891,83 +1789,66 @@ async createUserProfile(user, name) {
         }, 5000);
     }
 }
-
 // Initialize auth manager
 const auth = new AuthManager();
-
-// Expose to window for debugging
 window.auth = auth;
-
-// Helper function to check auth state
+// Helper functions
 async function checkAuthState() {
     const { data } = await window.supabaseClient.auth.getSession();
     auth.currentUser = data.session?.user || null;
     auth.updateAuthUI();
     return auth.currentUser;
 }
-
-// Load user data for dashboard
 async function loadUserData() {
     if (!auth.currentUser) {
         window.location.href = '../index.html';
         return;
     }
-    
     const userData = await auth.getUserData();
     if (userData) {
-        // Update dashboard with user data
         const userNameElements = document.querySelectorAll('#user-name, #welcome-name');
         userNameElements.forEach(el => {
             el.textContent = userData.name || userData.email.split('@')[0];
         });
-        
         document.getElementById('user-email').textContent = userData.email;
-        
-        // Update avatar with initials
         const avatar = document.getElementById('user-avatar');
         if (avatar && userData.name) {
             const initials = userData.name.split(' ').map(n => n[0]).join('').toUpperCase();
             avatar.textContent = initials;
         }
-        
-        // Update stats
         document.getElementById('meditation-streak').textContent = userData.meditation_streak || 0;
         document.getElementById('total-meditations').textContent = userData.total_meditations || 0;
         document.getElementById('journal-entries').textContent = userData.journal_entries || 0;
     }
 }
-
-// Check admin access
 async function checkAdminAccess() {
     const isAdmin = await auth.isAdmin();
     if (!isAdmin) {
         window.location.href = '../index.html';
     }
 }
-
-// Logout function
-async function logout() {
-    await auth.signOut();
-}
-
-// Add event listeners for logout buttons
+// Event listeners
 document.addEventListener('DOMContentLoaded', () => {
-    // Logout button on index page
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', logout);
+        logoutBtn.addEventListener('click', () => auth.signOut());
     }
-    
-    // Logout button on dashboard
     const dashboardLogout = document.getElementById('dashboard-logout');
     if (dashboardLogout) {
-        dashboardLogout.addEventListener('click', logout);
+        dashboardLogout.addEventListener('click', () => auth.signOut());
     }
-    
-    // Admin logout button
     const adminLogout = document.getElementById('admin-logout');
     if (adminLogout) {
-        adminLogout.addEventListener('click', logout);
+        adminLogout.addEventListener('click', () => auth.signOut());
+    }
+    // Initial check for dashboard/admin pages
+    if (window.location.pathname.includes('dashboard.html') || 
+        window.location.pathname.includes('admin.html')) {
+        checkAuthState().then(user => {
+            if (!user) {
+                window.location.href = '../index.html';
+            }
+        });
     }
 });
 ```
@@ -2867,8 +2748,8 @@ async function handleContent(supabase, userId, method, data) {
 ```env
 # Supabase Configuration
 SUPABASE_URL=https://revdnghkdjfxuxiqjddk.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Nzc2OTMxNywiZXhwIjoyMDgzMzQ1MzE3fQ.Ege9ONtBDc3pIf4v6pZ8w2a9VfMZOiJ_Qlv85JqYYg4
+SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
 # Application Settings
 SITE_NAME=Atlantis
 SITE_SUBTITLE=Spiritual Guidance
@@ -2898,8 +2779,8 @@ GOOGLE_ANALYTICS_ID=UA-XXXXXXXXX-X
   NODE_VERSION = "18"
 [context.production.environment]
   SUPABASE_URL = "https://revdnghkdjfxuxiqjddk.supabase.co"
-  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4"
-  SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Nzc2OTMxNywiZXhwIjoyMDgzMzQ1MzE3fQ.Ege9ONtBDc3pIf4v6pZ8w2a9VfMZOiJ_Qlv85JqYYg4"
+  SUPABASE_ANON_KEY = "@supabase_anon_key"
+  SUPABASE_SERVICE_KEY = "@supabase_service_key"
   NODE_ENV = "production"
 [context.deploy-preview.environment]
   NODE_ENV = "development"
@@ -2961,36 +2842,105 @@ A dynamic, bilingual spiritual guidance website with authentication, user dashbo
 2. Get your project URL and anon key from Settings > API
 3. Create the following tables:
 ```sql
--- Users table
+-- Enable extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- 1. Create users table (linked to Supabase Auth)
 CREATE TABLE users (
-  id UUID REFERENCES auth.users PRIMARY KEY,
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE NOT NULL,
   name TEXT,
   role TEXT DEFAULT 'user',
   meditation_streak INTEGER DEFAULT 0,
   total_meditations INTEGER DEFAULT 0,
   journal_entries INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
--- Journal entries table
+-- 2. Create journal entries table
 CREATE TABLE journal_entries (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   content TEXT,
   mood TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
--- Content table
+-- 3. Create content table
 CREATE TABLE content (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES users(id),
   title TEXT NOT NULL,
   content TEXT NOT NULL,
   type TEXT DEFAULT 'article',
   published BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
+-- 4. Enable Row Level Security
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE content ENABLE ROW LEVEL SECURITY;
+-- 5. Create RLS Policies
+-- USERS TABLE POLICIES:
+-- Allow users to create their own profile
+CREATE POLICY "Users can create own profile" ON users
+  FOR INSERT WITH CHECK (auth.uid() = id);
+-- Allow users to read their own data
+CREATE POLICY "Users can read own data" ON users
+  FOR SELECT USING (auth.uid() = id);
+-- Allow users to update their own data
+CREATE POLICY "Users can update own data" ON users
+  FOR UPDATE USING (auth.uid() = id);
+-- Allow service role full access (for admin functions)
+CREATE POLICY "Service role full access on users" ON users
+  FOR ALL USING (auth.role() = 'service_role');
+-- JOURNAL ENTRIES POLICIES:
+-- Allow users to manage their own journal entries
+CREATE POLICY "Users can manage own journal entries" ON journal_entries
+  FOR ALL USING (auth.uid() = user_id);
+-- Allow service role full access
+CREATE POLICY "Service role full access on journal_entries" ON journal_entries
+  FOR ALL USING (auth.role() = 'service_role');
+-- CONTENT TABLE POLICIES:
+-- Everyone can view published content
+CREATE POLICY "Everyone can view published content" ON content
+  FOR SELECT USING (published = true);
+-- Allow authenticated users to create content
+CREATE POLICY "Authenticated users can create content" ON content
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- Allow content creators to update their own content
+CREATE POLICY "Users can update own content" ON content
+  FOR UPDATE USING (auth.uid() = user_id);
+-- Allow service role full access
+CREATE POLICY "Service role full access on content" ON content
+  FOR ALL USING (auth.role() = 'service_role');
+-- 6. Create function to automatically create user profile
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1))
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 7. Create trigger for new user signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+-- 8. Enable realtime for tables (optional)
+ALTER PUBLICATION supabase_realtime ADD TABLE users;
+ALTER PUBLICATION supabase_realtime ADD TABLE journal_entries;
+ALTER PUBLICATION supabase_realtime ADD TABLE content;
+```
+-- to make nordafrique99 admin:
+UPDATE users 
+SET role = 'admin' 
+WHERE email = 'nordafrique99@gmail.com';
 ```
 4. Enable Row Level Security (RLS) and create policies.
 ### 3. Local Development
@@ -3006,7 +2956,8 @@ npm install
 3. Create a `.env` file with your Supabase credentials:
 ```env
 SUPABASE_URL=https://revdnghkdjfxuxiqjddk.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4
+SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
 ```
 ## Project Structure
 ```
@@ -3053,79 +3004,6 @@ MIT License - see LICENSE file for details.
 ---
 **Atlantis** - Your journey to spiritual growth begins here. ✨
 ```
-## Additional Setup Instructions
-### 1. **Supabase Database Setup**
-Run these SQL commands in Supabase SQL editor:
-```sql
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
--- Users table
-CREATE TABLE IF NOT EXISTS users (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    name TEXT,
-    role TEXT DEFAULT 'user',
-    meditation_streak INTEGER DEFAULT 0,
-    total_meditations INTEGER DEFAULT 0,
-    journal_entries INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
--- Journal entries
-CREATE TABLE IF NOT EXISTS journal_entries (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT,
-    mood TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
--- Content
-CREATE TABLE IF NOT EXISTS content (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES users(id),
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    type TEXT DEFAULT 'article',
-    published BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
--- Enable Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE content ENABLE ROW LEVEL SECURITY;
--- Create policies
-CREATE POLICY "Users can view own data" ON users
-    FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own data" ON users
-    FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can view own journal entries" ON journal_entries
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create journal entries" ON journal_entries
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own journal entries" ON journal_entries
-    FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own journal entries" ON journal_entries
-    FOR DELETE USING (auth.uid() = user_id);
--- Public content is viewable by everyone
-CREATE POLICY "Public content is viewable by everyone" ON content
-    FOR SELECT USING (published = true);
--- Admins can do everything
-CREATE POLICY "Admins have full access" ON users
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM users
-            WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
-CREATE POLICY "Admins have full access to content" ON content
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM users
-            WHERE id = auth.uid() AND role = 'admin'
-        )
-    );
 ```
 ### 2. **package.json** (for Netlify Functions)
 ```json
@@ -3387,62 +3265,3 @@ window.loadAdminData = loadAdminData;
 window.checkAdminAccess = checkAdminAccess;
 window.addNewLanguage = addNewLanguage;
 window.logout = window.auth ? window.auth.signOut : () => {};
-
-supabase updated:
--- First, disable RLS temporarily to fix the structure
-ALTER TABLE users DISABLE ROW LEVEL SECURITY;
-
--- Drop existing problematic policies
-DROP POLICY IF EXISTS "Users can insert own profile" ON users;
-DROP POLICY IF EXISTS "Users can view own data" ON users;
-DROP POLICY IF EXISTS "Users can update own data" ON users;
-DROP POLICY IF EXISTS "Service role can do everything" ON users;
-
--- Re-enable RLS
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-
--- Create new, simpler policies for the users table
--- Allow users to insert their own profile (this is key for signup)
-CREATE POLICY "Users can insert own profile" ON users
-    FOR INSERT 
-    WITH CHECK (auth.uid() = id);
-
--- Allow users to read their own data
-CREATE POLICY "Users can read own data" ON users
-    FOR SELECT 
-    USING (auth.uid() = id);
-
--- Allow users to update their own data
-CREATE POLICY "Users can update own data" ON users
-    FOR UPDATE 
-    USING (auth.uid() = id);
-
--- Allow service role (admin functions) to do everything
-CREATE POLICY "Service role full access" ON users
-    FOR ALL 
-    USING (auth.role() = 'service_role');
-
--- Add similar policies for journal_entries
-ALTER TABLE journal_entries DISABLE ROW LEVEL SECURITY;
-ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can manage own journal entries" ON journal_entries
-    FOR ALL 
-    USING (auth.uid() = user_id)
-    WITH CHECK (auth.uid() = user_id);
-
--- Fix content table policies too
-ALTER TABLE content DISABLE ROW LEVEL SECURITY;
-ALTER TABLE content ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Everyone can view published content" ON content
-    FOR SELECT 
-    USING (published = true);
-
-CREATE POLICY "Admins can manage content" ON content
-    FOR ALL 
-    USING (EXISTS (
-        SELECT 1 FROM users 
-        WHERE users.id = auth.uid() 
-        AND users.role = 'admin'
-    ));
