@@ -362,27 +362,29 @@ class Utils {
     }
 
     static showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type} fade-in`;
-        notification.innerHTML = `
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-            <span>${message}</span>
-            <button class="notification-close">&times;</button>
-        `;
-
-        document.body.appendChild(notification);
-
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 5000);
-
-        // Close button
-        notification.querySelector('.notification-close').addEventListener('click', () => {
+         // Translate the message if it's a key
+    const translatedMessage = window.t ? window.t(message, message) : message;
+    
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type} fade-in`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${translatedMessage}</span>
+        <button class="notification-close">&times;</button>
+    `;
+    document.body.appendChild(notification);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
             notification.remove();
-        });
+        }
+    }, 5000);
+    
+    // Close button
+    notification.querySelector('.notification-close').addEventListener('click', () => {
+        notification.remove();
+    });
     }
 
     static getQueryParam(name) {

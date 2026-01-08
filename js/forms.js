@@ -77,21 +77,20 @@ translate(key, defaultText = '') {
 
     // Handle login
     async handleLogin(e) {
-        e.preventDefault();
-        
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-
-        // Validate
-        if (!this.validateEmail(email)) {
-    auth.showErrorMessage('invalid_email');
-    return;
-}
-
-        if (password.length < 6) {
-    auth.showErrorMessage('password_length_error');
-    return;
-}
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    // Validate
+    if (!this.validateEmail(email)) {
+        auth.showErrorMessage('invalid_email');
+        return;
+    }
+    
+    if (password.length < 6) {
+        auth.showErrorMessage('password_length_error');
+        return;
+    }
 
         // Show loading
         const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -113,39 +112,38 @@ translate(key, defaultText = '') {
 
     // Handle signup
     async handleSignup(e) {
-        e.preventDefault();
-        
-        const name = document.getElementById('signup-name').value;
-        const email = document.getElementById('signup-email').value;
-        const password = document.getElementById('signup-password').value;
-        const confirm = document.getElementById('signup-confirm').value;
-        const terms = document.getElementById('terms').checked;
-
-        // Validate
-        if (!name.trim()) {
-    auth.showErrorMessage('name_required');
-    return;
-}
-
-        if (!this.validateEmail(email)) {
-    auth.showErrorMessage('invalid_email');
-    return;
-}
-
-        if (password.length < 6) {
-    auth.showErrorMessage('password_length_error');
-    return;
-}
-
-        if (password !== confirm) {
-    auth.showErrorMessage('password_mismatch');
-    return;
-}
-
-        if (!terms) {
-    auth.showErrorMessage('accept_terms_error');
-    return;
-}
+    e.preventDefault();
+    const name = document.getElementById('signup-name').value;
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const confirm = document.getElementById('signup-confirm').value;
+    const terms = document.getElementById('terms').checked;
+    
+    // Validate
+    if (!name.trim()) {
+        auth.showErrorMessage('name_required');
+        return;
+    }
+    
+    if (!this.validateEmail(email)) {
+        auth.showErrorMessage('invalid_email');
+        return;
+    }
+    
+    if (password.length < 6) {
+        auth.showErrorMessage('password_length_error');
+        return;
+    }
+    
+    if (password !== confirm) {
+        auth.showErrorMessage('password_mismatch');
+        return;
+    }
+    
+    if (!terms) {
+        auth.showErrorMessage('accept_terms_error');
+        return;
+    }
 
         // Show loading
         const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -170,14 +168,13 @@ translate(key, defaultText = '') {
 
     // Handle reset password
     async handleResetPassword(e) {
-        e.preventDefault();
-        
-        const email = document.getElementById('reset-email').value;
-
-        if (!this.validateEmail(email)) {
-    auth.showErrorMessage('invalid_email');
-    return;
-}
+    e.preventDefault();
+    const email = document.getElementById('reset-email').value;
+    
+    if (!this.validateEmail(email)) {
+        auth.showErrorMessage('invalid_email');
+        return;
+    }
 
         // Show loading
         const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -307,23 +304,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = document.getElementById('journal-text').value;
             const moodBtn = document.querySelector('.mood-btn.active');
             const mood = moodBtn ? moodBtn.dataset.mood : null;
-
+            
             if (!text.trim()) {
-                auth.showErrorMessage('Please write something in your journal');
+                auth.showErrorMessage('journal_empty');
                 return;
             }
-
+            
             const result = await forms.saveJournalEntry(text, mood);
             if (result.success) {
-                auth.showSuccessMessage('Journal entry saved successfully!');
+                auth.showSuccessMessage('journal_saved');
                 document.getElementById('journal-text').value = '';
-                
                 // Update entry count
                 const entriesElement = document.getElementById('journal-entries');
                 const currentCount = parseInt(entriesElement.textContent) || 0;
                 entriesElement.textContent = currentCount + 1;
             } else {
-                auth.showErrorMessage('Failed to save journal entry');
+                auth.showErrorMessage('journal_save_failed');
             }
         });
     }

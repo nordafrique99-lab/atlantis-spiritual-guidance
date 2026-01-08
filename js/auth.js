@@ -228,24 +228,27 @@ translate(key, defaultText = '') {
 	
     // Update auth UI
     updateAuthUI() {
-        const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
-        const logoutBtn = document.getElementById('logout-btn');
-        const userStatus = document.getElementById('user-status');
-        
-        if (this.currentUser) {
-            if (loginBtn) loginBtn.style.display = 'none';
-            if (logoutBtn) logoutBtn.style.display = 'inline-block';
-            if (userStatus) {
-                userStatus.innerHTML = `<p>Welcome back, ${this.currentUser.email}!</p>`;
-			}
-			} else {
-            if (loginBtn) loginBtn.style.display = 'inline-block';
-            if (logoutBtn) logoutBtn.style.display = 'none';
-            if (userStatus) {
-                userStatus.innerHTML = `<p>You are browsing as a guest. <a href="pages/login.html">Login</a> for personalized guidance.</p>`;
-			}
-		}
-	}
+    const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userStatus = document.getElementById('user-status');
+    
+    if (this.currentUser) {
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'inline-block';
+        if (userStatus) {
+            // Use translation for welcome message
+            const welcomeMessage = window.t('welcome_user', 'Welcome back, ') + this.currentUser.email;
+            userStatus.innerHTML = `<p>${welcomeMessage}</p>`;
+        }
+    } else {
+        if (loginBtn) loginBtn.style.display = 'inline-block';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        if (userStatus) {
+            // Use translation key for guest message
+            userStatus.innerHTML = `<p>${window.t('guest_message', 'You are browsing as a guest. <a href="pages/login.html">Login</a> for personalized guidance.')}</p>`;
+        }
+    }
+}
 	
     // Show message functions (keep as is)
     showSuccessMessage(message) {
@@ -261,25 +264,44 @@ translate(key, defaultText = '') {
 	}
 	
     showMessage(message, type = 'info') {
-		// Check if message is a translation key
-		const displayMessage = this.translate(message, message);
-		
-		const existing = document.querySelector('.auth-message');
-		if (existing) existing.remove();
-		
-		const messageDiv = document.createElement('div');
-		messageDiv.className = `auth-message ${type}-message fade-in`;
-		messageDiv.textContent = displayMessage;
-		
-		const authContainer = document.querySelector('.auth-container') || document.body;
-		authContainer.prepend(messageDiv);
-		
-		setTimeout(() => {
-			if (messageDiv.parentNode) {
-				messageDiv.remove();
-			}
-		}, 5000);
-	}
+    // Check if message is a translation key
+    let displayMessage;
+    
+    if (window.t && typeof window.t === 'function') {
+        // Try to translate the message
+        displayMessage = window.t(message, message);
+    } else if (window.i18n && window.i18n.translate) {
+        // Fallback to i18n instance
+        displayMessage = window.i18n.translate(message, message);
+    } else {
+        // Use message as-is
+        displayMessage = message;
+    }
+    
+    const existing = document.querySelector('.auth-message');
+    if (existing) existing.remove();
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `auth-message ${type}-message fade-in`;
+    
+    // Check if it contains HTML
+    if (displayMessage.includes('<') && displayMessage.includes('>')) {
+        messageDiv.innerHTML = displayMessage;
+    } else {
+        messageDiv.textContent = displayMessage;
+    }
+    
+    const authContainer = document.querySelector('.auth-container') || 
+                          document.querySelector('.container') || 
+                          document.body;
+    authContainer.prepend(messageDiv);
+    
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
+    }, 5000);
+}
 }
 
 // Initialize auth manager
