@@ -44,6 +44,12 @@ class FormManager {
         this.initPasswordToggles();
     }
 
+translate(key, defaultText = '') {
+    if (window.i18n && window.i18n.translate) {
+        return window.i18n.translate(key, defaultText);
+    }
+    return defaultText || key;
+}
     // Show specific form
     showForm(formName) {
         // Hide all forms
@@ -78,19 +84,19 @@ class FormManager {
 
         // Validate
         if (!this.validateEmail(email)) {
-            auth.showErrorMessage('Please enter a valid email address');
-            return;
-        }
+    auth.showErrorMessage('invalid_email');
+    return;
+}
 
         if (password.length < 6) {
-            auth.showErrorMessage('Password must be at least 6 characters');
-            return;
-        }
+    auth.showErrorMessage('password_length_error');
+    return;
+}
 
         // Show loading
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + this.translate('logging_in');
         submitBtn.disabled = true;
 
         // Sign in
@@ -117,34 +123,34 @@ class FormManager {
 
         // Validate
         if (!name.trim()) {
-            auth.showErrorMessage('Please enter your name');
-            return;
-        }
+    auth.showErrorMessage('name_required');
+    return;
+}
 
         if (!this.validateEmail(email)) {
-            auth.showErrorMessage('Please enter a valid email address');
-            return;
-        }
+    auth.showErrorMessage('invalid_email');
+    return;
+}
 
         if (password.length < 6) {
-            auth.showErrorMessage('Password must be at least 6 characters');
-            return;
-        }
+    auth.showErrorMessage('password_length_error');
+    return;
+}
 
         if (password !== confirm) {
-            auth.showErrorMessage('Passwords do not match');
-            return;
-        }
+    auth.showErrorMessage('password_mismatch');
+    return;
+}
 
         if (!terms) {
-            auth.showErrorMessage('Please accept the terms and conditions');
-            return;
-        }
+    auth.showErrorMessage('accept_terms_error');
+    return;
+}
 
         // Show loading
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + this.translate('creating_account');
         submitBtn.disabled = true;
 
         // Sign up
@@ -155,10 +161,10 @@ class FormManager {
         submitBtn.disabled = false;
 
         if (result.success) {
-            auth.showSuccessMessage('Account created successfully! Please check your email for verification.');
+            auth.showSuccessMessage('signup_success');
             this.showForm('login');
         } else {
-            auth.showErrorMessage(result.error || 'Signup failed. Please try again.');
+            auth.showErrorMessage(result.error || 'signup_failed');
         }
     }
 
@@ -169,14 +175,14 @@ class FormManager {
         const email = document.getElementById('reset-email').value;
 
         if (!this.validateEmail(email)) {
-            auth.showErrorMessage('Please enter a valid email address');
-            return;
-        }
+    auth.showErrorMessage('invalid_email');
+    return;
+}
 
         // Show loading
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + this.translate('sending_reset_link');
         submitBtn.disabled = true;
 
         // Send reset email

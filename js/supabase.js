@@ -1,6 +1,6 @@
 // Supabase configuration
 const SUPABASE_URL = 'https://revdnghkdjfxuxiqjddk.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4';
 
 // Initialize Supabase client only once
 if (!window.supabaseClient) {
@@ -15,7 +15,7 @@ if (!window.supabaseClient) {
             try {
                 const { data, error } = await supabase.auth.getSession();
                 if (error) {
-                    console.error('Supabase connection error:', error);
+                    console.error(window.t('supabase_connection_error') + ':', error);
                     return false;
                 }
                 console.log('Supabase connected successfully');
@@ -56,5 +56,4 @@ if (!window.supabaseClient) {
             update: () => ({ eq: () => Promise.reject(new Error('Supabase not initialized')) })
         })
     };
-
 }

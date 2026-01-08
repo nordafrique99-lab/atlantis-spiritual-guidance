@@ -8,8 +8,8 @@ class AuthManager {
         this.currentUser = null;
         this.supabase = window.supabaseClient;
         this.init();
-    }
-
+	}
+	
     async init() {
         // Check existing session
         const { data: { session } } = await this.supabase.auth.getSession();
@@ -21,22 +21,30 @@ class AuthManager {
             this.updateAuthUI();
             
             if (event === 'SIGNED_IN') {
-                this.showSuccessMessage('Welcome!');
+                this.showSuccessMessage(this.translate('welcome_back'));
                 // Redirect to dashboard if we're on login page
                 if (window.location.pathname.includes('login.html')) {
                     setTimeout(() => {
                         window.location.href = '../pages/dashboard.html';
-                    }, 1000);
-                }
-            } else if (event === 'SIGNED_OUT') {
-                this.showInfoMessage('Successfully logged out');
-            }
-        });
+					}, 1000);
+				}
+				} else if (event === 'SIGNED_OUT') {
+                this.showInfoMessage(this.translate('logout_success'));
+			}
+		});
         
         // Initial UI update
         this.updateAuthUI();
-    }
+	}
 
+// Add a translation helper method to AuthManager class
+translate(key, defaultText = '') {
+    if (window.i18n && window.i18n.translate) {
+        return window.i18n.translate(key, defaultText);
+    }
+    return defaultText || key;
+}
+	
     // Sign up new user - NO EMAIL CONFIRMATION NEEDED
     async signUp(email, password, name) {
         try {
@@ -50,15 +58,15 @@ class AuthManager {
                     data: {
                         name: name,
                         created_at: new Date().toISOString()
-                    }
+					}
                     // REMOVED emailRedirectTo - no confirmation needed
-                }
-            });
+				}
+			});
             
             if (error) {
                 console.error('Auth signup error:', error);
                 throw error;
-            }
+			}
             
             console.log('Auth signup successful, user:', data.user);
             
@@ -66,15 +74,15 @@ class AuthManager {
             const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
                 email,
                 password
-            });
+			});
             
             if (signInError) {
                 console.error('Auto signin error:', signInError);
                 return { 
                     success: false, 
                     error: signInError.message 
-                };
-            }
+				};
+			}
             
             console.log('Auto signin successful');
             this.currentUser = signInData.user;
@@ -83,34 +91,34 @@ class AuthManager {
                 success: true, 
                 data: signInData,
                 message: 'Account created successfully!'
-            };
+			};
             
-        } catch (error) {
+			} catch (error) {
             console.error('Sign up error:', error);
             return { 
                 success: false, 
                 error: error.message,
                 code: error.code
-            };
-        }
-    }
-
+			};
+		}
+	}
+	
     // Sign in user (no changes needed)
     async signIn(email, password) {
         try {
             const { data, error } = await this.supabase.auth.signInWithPassword({
                 email,
                 password
-            });
+			});
             
             if (error) throw error;
             return { success: true, data };
-        } catch (error) {
+			} catch (error) {
             console.error('Sign in error:', error);
             return { success: false, error: error.message };
-        }
-    }
-
+		}
+	}
+	
     // Sign out user
     async signOut() {
         try {
@@ -121,59 +129,59 @@ class AuthManager {
             if (window.location.pathname.includes('dashboard.html') || 
                 window.location.pathname.includes('admin.html')) {
                 window.location.href = '../index.html';
-            } else {
+				} else {
                 window.location.reload();
-            }
-        } catch (error) {
+			}
+			} catch (error) {
             console.error('Sign out error:', error);
-        }
-    }
-
+		}
+	}
+	
     // Reset password
     async resetPassword(email) {
         try {
             const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: `${window.location.origin}/pages/reset-password.html`,
-            });
+			});
             
             if (error) throw error;
             return { success: true };
-        } catch (error) {
+			} catch (error) {
             console.error('Reset password error:', error);
             return { success: false, error: error.message };
-        }
-    }
-
+		}
+	}
+	
     // Check if user is admin
     async isAdmin() {
         if (!this.currentUser) return false;
         
         try {
             const { data, error } = await this.supabase
-                .from('users')
-                .select('role')
-                .eq('id', this.currentUser.id)
-                .single();
-                
+			.from('users')
+			.select('role')
+			.eq('id', this.currentUser.id)
+			.single();
+			
             if (error || !data) return false;
             return data.role === 'admin';
-        } catch (error) {
+			} catch (error) {
             console.error('Admin check error:', error);
             return false;
-        }
-    }
-
+		}
+	}
+	
     // Get user data
     async getUserData() {
         if (!this.currentUser) return null;
         
         try {
             const { data, error } = await this.supabase
-                .from('users')
-                .select('*')
-                .eq('id', this.currentUser.id)
-                .single();
-                
+			.from('users')
+			.select('*')
+			.eq('id', this.currentUser.id)
+			.single();
+			
             if (error) {
                 // If user doesn't exist in users table, create it
                 console.log('Creating user profile...');
@@ -186,38 +194,38 @@ class AuthManager {
                     meditation_streak: 0,
                     total_meditations: 0,
                     journal_entries: 0
-                };
-            }
+				};
+			}
             return data;
-        } catch (error) {
+			} catch (error) {
             console.error('Get user data error:', error);
             return null;
-        }
-    }
-
+		}
+	}
+	
     // Create user profile if missing
     async createUserProfile(user) {
         try {
             const { error } = await this.supabase
-                .from('users')
-                .insert([
-                    {
-                        id: user.id,
-                        email: user.email,
-                        name: user.user_metadata?.name || user.email.split('@')[0],
-                        created_at: new Date().toISOString(),
-                        role: 'user'
-                    }
-                ]);
+			.from('users')
+			.insert([
+				{
+					id: user.id,
+					email: user.email,
+					name: user.user_metadata?.name || user.email.split('@')[0],
+					created_at: new Date().toISOString(),
+					role: 'user'
+				}
+			]);
             
             if (error && error.code !== '23505') { // Ignore duplicate key errors
                 console.error('Profile creation error:', error);
-            }
-        } catch (error) {
+			}
+			} catch (error) {
             console.error('Error creating profile:', error);
-        }
-    }
-
+		}
+	}
+	
     // Update auth UI
     updateAuthUI() {
         const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
@@ -229,46 +237,49 @@ class AuthManager {
             if (logoutBtn) logoutBtn.style.display = 'inline-block';
             if (userStatus) {
                 userStatus.innerHTML = `<p>Welcome back, ${this.currentUser.email}!</p>`;
-            }
-        } else {
+			}
+			} else {
             if (loginBtn) loginBtn.style.display = 'inline-block';
             if (logoutBtn) logoutBtn.style.display = 'none';
             if (userStatus) {
                 userStatus.innerHTML = `<p>You are browsing as a guest. <a href="pages/login.html">Login</a> for personalized guidance.</p>`;
-            }
-        }
-    }
-
+			}
+		}
+	}
+	
     // Show message functions (keep as is)
     showSuccessMessage(message) {
         this.showMessage(message, 'success');
-    }
-
+	}
+	
     showErrorMessage(message) {
         this.showMessage(message, 'error');
-    }
-
+	}
+	
     showInfoMessage(message) {
         this.showMessage(message, 'info');
-    }
-
+	}
+	
     showMessage(message, type = 'info') {
-        const existing = document.querySelector('.auth-message');
-        if (existing) existing.remove();
-        
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `auth-message ${type}-message fade-in`;
-        messageDiv.textContent = message;
-        
-        const authContainer = document.querySelector('.auth-container') || document.body;
-        authContainer.prepend(messageDiv);
-        
-        setTimeout(() => {
-            if (messageDiv.parentNode) {
-                messageDiv.remove();
-            }
-        }, 5000);
-    }
+		// Check if message is a translation key
+		const displayMessage = this.translate(message, message);
+		
+		const existing = document.querySelector('.auth-message');
+		if (existing) existing.remove();
+		
+		const messageDiv = document.createElement('div');
+		messageDiv.className = `auth-message ${type}-message fade-in`;
+		messageDiv.textContent = displayMessage;
+		
+		const authContainer = document.querySelector('.auth-container') || document.body;
+		authContainer.prepend(messageDiv);
+		
+		setTimeout(() => {
+			if (messageDiv.parentNode) {
+				messageDiv.remove();
+			}
+		}, 5000);
+	}
 }
 
 // Initialize auth manager
@@ -287,14 +298,14 @@ async function loadUserData() {
     if (!auth.currentUser) {
         window.location.href = '../index.html';
         return;
-    }
+	}
     
     const userData = await auth.getUserData();
     if (userData) {
         const userNameElements = document.querySelectorAll('#user-name, #welcome-name');
         userNameElements.forEach(el => {
             el.textContent = userData.name || userData.email.split('@')[0];
-        });
+		});
         
         document.getElementById('user-email').textContent = userData.email;
         
@@ -302,19 +313,19 @@ async function loadUserData() {
         if (avatar && userData.name) {
             const initials = userData.name.split(' ').map(n => n[0]).join('').toUpperCase();
             avatar.textContent = initials;
-        }
+		}
         
         document.getElementById('meditation-streak').textContent = userData.meditation_streak || 0;
         document.getElementById('total-meditations').textContent = userData.total_meditations || 0;
         document.getElementById('journal-entries').textContent = userData.journal_entries || 0;
-    }
+	}
 }
 
 async function checkAdminAccess() {
     const isAdmin = await auth.isAdmin();
     if (!isAdmin) {
         window.location.href = '../index.html';
-    }
+	}
 }
 
 // Event listeners
@@ -322,17 +333,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => auth.signOut());
-    }
+	}
     
     const dashboardLogout = document.getElementById('dashboard-logout');
     if (dashboardLogout) {
         dashboardLogout.addEventListener('click', () => auth.signOut());
-    }
+	}
     
     const adminLogout = document.getElementById('admin-logout');
     if (adminLogout) {
         adminLogout.addEventListener('click', () => auth.signOut());
-    }
+	}
     
     // Initial check for dashboard/admin pages
     if (window.location.pathname.includes('dashboard.html') || 
@@ -340,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         checkAuthState().then(user => {
             if (!user) {
                 window.location.href = '../index.html';
-            }
-        });
-    }
+			}
+		});
+	}
 });

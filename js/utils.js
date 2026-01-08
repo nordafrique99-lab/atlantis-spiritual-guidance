@@ -32,6 +32,15 @@ class I18nManager {
     }
 }
 
+// Translation helper method
+translate(key, defaultText = '') {
+    if (this.translations && this.translations[key]) {
+        return this.translations[key];
+    }
+    // If not found, return default text or the key itself
+    return defaultText || key;
+}
+
     getEmbeddedTranslations() {
         // Embedded translations for English and Arabic
         return {
@@ -102,7 +111,36 @@ class I18nManager {
                 "day_streak": "Day Streak",
                 "total_meditations": "Total Meditations",
                 "journal_entries": "Journal Entries",
-                "recent_wisdom_title": "Recent Wisdom"
+                "recent_wisdom_title": "Recent Wisdom",
+            "welcome_back": "Welcome!",
+            "logout_success": "Successfully logged out",
+            "logging_in": "Logging in...",
+            "creating_account": "Creating account...",
+            "sending_reset_link": "Sending...",
+            "invalid_email": "Please enter a valid email address",
+            "password_length_error": "Password must be at least 6 characters",
+            "password_mismatch": "Passwords do not match",
+            "accept_terms_error": "Please accept the terms and conditions",
+            "name_required": "Please enter your name",
+            "login_failed": "Login failed. Please check your credentials.",
+            "signup_failed": "Signup failed. Please try again.",
+            "signup_success": "Account created successfully!",
+            "reset_email_sent": "Password reset email sent! Please check your inbox.",
+            "reset_email_failed": "Failed to send reset email. Please try again.",
+            "journal_empty": "Please write something in your journal",
+            "journal_saved": "Journal entry saved successfully!",
+            "journal_save_failed": "Failed to save journal entry",
+            "loading": "Loading...",
+            "connection_error": "Connection Error",
+            "connection_error_message": "Unable to connect to the server. Please refresh the page.",
+            "auth_initialization_error": "Auth not initialized properly",
+            "supabase_connection_error": "Supabase connection error",
+            "profile_creation": "Creating user profile...",
+            "guest_message": "You are browsing as a guest. <a href=\"pages/login.html\">Login</a> for personalized guidance.",
+            "welcome_user": "Welcome back, ",
+            "default_error": "An error occurred. Please try again.",
+            "validation_error": "Validation error",
+            "unknown_error": "Unknown error occurred"
             },
             ar: {
                 "site_name": "أتلانتس",
@@ -171,7 +209,36 @@ class I18nManager {
                 "day_streak": "تتابع الأيام",
                 "total_meditations": "إجمالي التأملات",
                 "journal_entries": "مدخلات المذكرات",
-                "recent_wisdom_title": "الحكمة الحديثة"
+                "recent_wisdom_title": "الحكمة الحديثة",
+            "welcome_back": "مرحبًا!",
+            "logout_success": "تم تسجيل الخروج بنجاح",
+            "logging_in": "جاري تسجيل الدخول...",
+            "creating_account": "جاري إنشاء الحساب...",
+            "sending_reset_link": "جاري الإرسال...",
+            "invalid_email": "يرجى إدخال بريد إلكتروني صالح",
+            "password_length_error": "يجب أن تكون كلمة المرور 6 أحرف على الأقل",
+            "password_mismatch": "كلمات المرور غير متطابقة",
+            "accept_terms_error": "يرجى الموافقة على الشروط والأحكام",
+            "name_required": "يرجى إدخال اسمك",
+            "login_failed": "فشل تسجيل الدخول. يرجى التحقق من بيانات الاعتماد الخاصة بك.",
+            "signup_failed": "فشل إنشاء الحساب. يرجى المحاولة مرة أخرى.",
+            "signup_success": "تم إنشاء الحساب بنجاح!",
+            "reset_email_sent": "تم إرسال بريد إعادة تعيين كلمة المرور! يرجى التحقق من بريدك الوارد.",
+            "reset_email_failed": "فشل إرسال بريد إعادة التعيين. يرجى المحاولة مرة أخرى.",
+            "journal_empty": "يرجى كتابة شيء في المذكرات",
+            "journal_saved": "تم حفظ مدخل المذكرات بنجاح!",
+            "journal_save_failed": "فشل حفظ مدخل المذكرات",
+            "loading": "جاري التحميل...",
+            "connection_error": "خطأ في الاتصال",
+            "connection_error_message": "تعذر الاتصال بالخادم. يرجى تحديث الصفحة.",
+            "auth_initialization_error": "لم يتم تهيئة المصادقة بشكل صحيح",
+            "supabase_connection_error": "خطأ في اتصال Supabase",
+            "profile_creation": "جاري إنشاء الملف الشخصي...",
+            "guest_message": "أنت تتصفح كضيف. <a href=\"pages/login.html\">سجل الدخول</a> للحصول على إرشادات مخصصة.",
+            "welcome_user": "مرحبًا بعودتك، ",
+            "default_error": "حدث خطأ. يرجى المحاولة مرة أخرى.",
+            "validation_error": "خطأ في التحقق",
+            "unknown_error": "حدث خطأ غير معروف"
             }
         }[this.currentLang] || {};
     }
@@ -347,6 +414,17 @@ class Utils {
         return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
     }
 }
+
+// Global translation helper
+window.translate = (key, defaultText = '') => {
+    if (window.i18n && window.i18n.translate) {
+        return window.i18n.translate(key, defaultText);
+    }
+    return defaultText || key;
+};
+
+// Short alias
+window.t = window.translate;
 
 // Export to window
 window.i18n = i18n;
