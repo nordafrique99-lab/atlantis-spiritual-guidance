@@ -45,5 +45,4 @@
   included_files = ["supabase/**", "package.json"]
 
 [functions.protected-api]
-
   included_files = ["supabase/**", "package.json"]

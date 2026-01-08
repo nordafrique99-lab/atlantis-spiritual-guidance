@@ -1,6 +1,6 @@
 {
   "name": "atlantis-spiritual-guidance",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Spiritual guidance platform with bilingual support",
   "scripts": {
     "dev": "netlify dev",
@@ -16,5 +16,4 @@
   "engines": {
     "node": ">=18.0.0"
   }
-
 }

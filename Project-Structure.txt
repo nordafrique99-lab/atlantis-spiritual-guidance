@@ -125,12 +125,24 @@
 <script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/forms.js"></script>
-    <script>
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('current-year').textContent = new Date().getFullYear();
-            updateAuthUI();
-        });
+<script>
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+        // Wait a bit for auth to initialize, then update UI
+        setTimeout(() => {
+            if (window.auth && typeof window.auth.updateAuthUI === 'function') {
+                window.auth.updateAuthUI();
+            } else {
+                console.warn('Auth not initialized properly');
+                // Fallback: update the user status manually
+                const userStatus = document.getElementById('user-status');
+                if (userStatus) {
+                    userStatus.innerHTML = '<p>You are browsing as a guest. <a href="pages/login.html">Login</a> for personalized guidance.</p>';
+                }
+            }
+        }, 500);
+    });
     </script>
 </body>
 </html>
@@ -1484,85 +1496,116 @@ footer {
 ```
 ### 6. **js/supabase.js**
 ```javascript
-// Supabase configuration - Make sure to use YOUR actual Supabase URL and key
+// Supabase configuration
 const SUPABASE_URL = 'https://revdnghkdjfxuxiqjddk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4';
-
-// Check if Supabase is already loaded
+// Initialize Supabase client only once
 if (!window.supabaseClient) {
-    // Initialize Supabase client
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
-    // Test connection
-    async function testSupabaseConnection() {
-        try {
-            const { data, error } = await supabase.auth.getSession();
-            if (error) {
-                console.error('Supabase connection error:', error);
+    // Check if supabase library is loaded
+    if (!window.supabase) {
+        console.error('Supabase library not loaded. Make sure @supabase/supabase-js is loaded first.');
+    } else {
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Test connection
+        async function testSupabaseConnection() {
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('Supabase connection error:', error);
+                    return false;
+                }
+                console.log('Supabase connected successfully');
+                return true;
+            } catch (error) {
+                console.error('Supabase connection failed:', error);
                 return false;
             }
-            console.log('Supabase connected successfully');
-            return true;
-        } catch (error) {
-            console.error('Supabase connection failed:', error);
-            return false;
         }
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            testSupabaseConnection();
+        });
+        // Export supabase client
+        window.supabaseClient = supabase;
+        console.log('Supabase client initialized');
     }
-    
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', () => {
-        testSupabaseConnection();
-    });
-    
-    // Export supabase client
-    window.supabaseClient = supabase;
-    console.log('Supabase client initialized');
 }
-
-// Global access
-const supabase = window.supabaseClient;
+// Global access - this won't redeclare if already defined
+if (!window.supabaseClient) {
+    console.warn('Supabase client not initialized. Creating dummy client.');
+    window.supabaseClient = {
+        auth: {
+            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+            signUp: () => Promise.reject(new Error('Supabase not initialized')),
+            signInWithPassword: () => Promise.reject(new Error('Supabase not initialized')),
+            signOut: () => Promise.reject(new Error('Supabase not initialized')),
+            resetPasswordForEmail: () => Promise.reject(new Error('Supabase not initialized')),
+            updateUser: () => Promise.reject(new Error('Supabase not initialized')),
+            onAuthStateChange: () => ({})
+        },
+        from: () => ({
+            insert: () => ({ select: () => ({ single: () => Promise.reject(new Error('Supabase not initialized')) }) }),
+            select: () => ({ eq: () => ({ single: () => Promise.reject(new Error('Supabase not initialized')) }) }),
+            update: () => ({ eq: () => Promise.reject(new Error('Supabase not initialized')) })
+        })
+    };
+}
 ```
 ### 7. **js/auth.js**
 ```javascript
 // Authentication functions
 // Check if supabase is available
-if (typeof supabase === 'undefined') {
-    console.error('Supabase is not defined. Make sure supabase.js is loaded first.');
-    // Try to get from window object
-    if (window.supabaseClient) {
-        var supabase = window.supabaseClient;
-    } else {
-        // Create a dummy supabase object to prevent further errors
-        var supabase = {
-            auth: {
-                getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-                signUp: () => Promise.reject(new Error('Supabase not initialized')),
-                signInWithPassword: () => Promise.reject(new Error('Supabase not initialized')),
-                signOut: () => Promise.reject(new Error('Supabase not initialized')),
-                resetPasswordForEmail: () => Promise.reject(new Error('Supabase not initialized')),
-                updateUser: () => Promise.reject(new Error('Supabase not initialized'))
-            },
-            from: () => ({
-                insert: () => ({ select: () => ({ single: () => Promise.reject(new Error('Supabase not initialized')) }) }),
-                select: () => ({ eq: () => ({ single: () => Promise.reject(new Error('Supabase not initialized')) }) }),
-                update: () => ({ eq: () => Promise.reject(new Error('Supabase not initialized')) })
+if (!window.supabaseClient || !window.supabaseClient.auth) {
+    console.error('Supabase is not properly initialized. Make sure supabase.js is loaded first.');
+    // Create a minimal dummy supabase object to prevent errors
+    window.supabaseClient = {
+        auth: {
+            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+            signUp: () => Promise.reject(new Error('Supabase not initialized')),
+            signInWithPassword: () => Promise.reject(new Error('Supabase not initialized')),
+            signOut: () => Promise.reject(new Error('Supabase not initialized')),
+            resetPasswordForEmail: () => Promise.reject(new Error('Supabase not initialized')),
+            updateUser: () => Promise.reject(new Error('Supabase not initialized')),
+            onAuthStateChange: (callback) => {
+                console.warn('Auth state change listener registered but Supabase not initialized');
+                return { data: { subscription: { unsubscribe: () => {} } } };
+            }
+        },
+        from: () => ({
+            insert: () => ({ 
+                select: () => ({ 
+                    single: () => Promise.reject(new Error('Supabase not initialized')) 
+                }) 
+            }),
+            select: () => ({ 
+                eq: () => ({ 
+                    single: () => Promise.reject(new Error('Supabase not initialized')) 
+                }) 
+            }),
+            update: () => ({ 
+                eq: () => Promise.reject(new Error('Supabase not initialized')) 
             })
-        };
-    }
+        })
+    };
 }
+
 class AuthManager {
     constructor() {
         this.currentUser = null;
+        this.supabase = window.supabaseClient; // Store reference here
         this.init();
     }
+
     async init() {
         // Check existing session
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await this.supabase.auth.getSession();
         this.currentUser = session?.user || null;
+        
         // Listen for auth changes
-        supabase.auth.onAuthStateChange((event, session) => {
+        this.supabase.auth.onAuthStateChange((event, session) => {
             this.currentUser = session?.user || null;
             this.updateAuthUI();
+            
             if (event === 'SIGNED_IN') {
                 this.showSuccessMessage('Welcome back!');
                 window.location.href = 'pages/dashboard.html';
@@ -1571,33 +1614,92 @@ class AuthManager {
             }
         });
     }
+
     // Sign up new user
     async signUp(email, password, name) {
-        try {
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        name: name,
-                        created_at: new Date().toISOString()
-                    }
-                }
-            });
-            if (error) throw error;
-            // Create user profile in database
-            if (data.user) {
-                await this.createUserProfile(data.user, name);
+    try {
+        console.log('Starting signup for:', email);
+        
+        // First, sign up with Supabase Auth
+        const { data, error } = await this.supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    name: name,
+                    created_at: new Date().toISOString()
+                },
+                // Use Netlify URL if available, otherwise localhost for testing
+                emailRedirectTo: window.location.hostname.includes('netlify.app') 
+                    ? `${window.location.origin}/pages/login.html`
+                    : 'http://localhost:8888/pages/login.html'
             }
-            return { success: true, data };
-        } catch (error) {
-            console.error('Sign up error:', error);
-            return { success: false, error: error.message };
+        });
+        
+        if (error) {
+            console.error('Auth signup error:', error);
+            throw error;
         }
+        
+        console.log('Auth signup successful, user:', data.user);
+        
+        // IMPORTANT: Sign in immediately after signup to get session
+        const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
+            email,
+            password
+        });
+        
+        if (signInError) {
+            console.error('Auto signin error:', signInError);
+            // Continue anyway - user can verify email later
+        } else {
+            console.log('Auto signin successful');
+            this.currentUser = signInData.user;
+        }
+        
+        // Create user profile - but only if we have a session
+        if (data.user) {
+            await this.createUserProfile(data.user, name);
+        }
+        
+        return { 
+            success: true, 
+            data,
+            message: data.user?.identities?.length === 0 
+                ? 'Please check your email to confirm your account before logging in.'
+                : 'Account created successfully!'
+        };
+    } catch (error) {
+        console.error('Sign up error:', error);
+        return { 
+            success: false, 
+            error: error.message,
+            code: error.code
+        };
     }
-    // Create user profile
-    async createUserProfile(user, name) {
-        const { error } = await supabase
+}
+
+async createUserProfile(user, name) {
+    try {
+        console.log('Creating user profile for:', user.id);
+        
+        // Get current session to ensure we have a token
+        const { data: { session } } = await this.supabase.auth.getSession();
+        
+        if (!session) {
+            console.log('No session found, waiting for auth state...');
+            // Wait a bit and try again
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const { data: { session: retrySession } } = await this.supabase.auth.getSession();
+            if (!retrySession) {
+                console.warn('Still no session after waiting. User may need to confirm email first.');
+                return;
+            }
+        }
+        
+        // Try to insert the user profile
+        const { data, error } = await this.supabase
             .from('users')
             .insert([
                 {
@@ -1607,20 +1709,48 @@ class AuthManager {
                     created_at: new Date().toISOString(),
                     meditation_streak: 0,
                     total_meditations: 0,
-                    journal_entries: 0
+                    journal_entries: 0,
+                    role: 'user'
                 }
-            ]);
+            ])
+            .select();  // Add .select() to get feedback
+            
         if (error) {
-            console.error('Profile creation error:', error);
+            console.error('Profile creation error details:', error);
+            
+            // If it's a duplicate key error, that's okay - profile already exists
+            if (error.code === '23505') {
+                console.log('User profile already exists, that\'s fine');
+                return;
+            }
+            
+            // For RLS errors, we might need to use a different approach
+            if (error.code === '42501') {
+                console.warn('RLS policy prevented insertion. This may be okay if user needs to confirm email first.');
+                // Schedule a retry for later
+                setTimeout(() => this.createUserProfile(user, name), 5000);
+                return;
+            }
+            
+            throw error;
         }
+        
+        console.log('Profile created successfully:', data);
+    } catch (error) {
+        console.error('Error in createUserProfile:', error);
+        // Don't throw - let signup continue even if profile creation fails
+        // The user can complete profile setup later
     }
+}
+
     // Sign in user
     async signIn(email, password) {
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await this.supabase.auth.signInWithPassword({
                 email,
                 password
             });
+            
             if (error) throw error;
             return { success: true, data };
         } catch (error) {
@@ -1628,22 +1758,25 @@ class AuthManager {
             return { success: false, error: error.message };
         }
     }
+
     // Sign out user
     async signOut() {
         try {
-            const { error } = await supabase.auth.signOut();
+            const { error } = await this.supabase.auth.signOut();
             if (error) throw error;
             window.location.href = '../index.html';
         } catch (error) {
             console.error('Sign out error:', error);
         }
     }
+
     // Reset password
     async resetPassword(email) {
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: `${window.location.origin}/pages/reset-password.html`,
             });
+            
             if (error) throw error;
             return { success: true };
         } catch (error) {
@@ -1651,12 +1784,14 @@ class AuthManager {
             return { success: false, error: error.message };
         }
     }
+
     // Update password
     async updatePassword(newPassword) {
         try {
-            const { error } = await supabase.auth.updateUser({
+            const { error } = await this.supabase.auth.updateUser({
                 password: newPassword
             });
+            
             if (error) throw error;
             return { success: true };
         } catch (error) {
@@ -1664,36 +1799,44 @@ class AuthManager {
             return { success: false, error: error.message };
         }
     }
+
     // Check if user is admin
     async isAdmin() {
         if (!this.currentUser) return false;
-        const { data, error } = await supabase
+        
+        const { data, error } = await this.supabase
             .from('users')
             .select('role')
             .eq('id', this.currentUser.id)
             .single();
+            
         if (error || !data) return false;
         return data.role === 'admin';
     }
+
     // Get user data
     async getUserData() {
         if (!this.currentUser) return null;
-        const { data, error } = await supabase
+        
+        const { data, error } = await this.supabase
             .from('users')
             .select('*')
             .eq('id', this.currentUser.id)
             .single();
+            
         if (error) {
             console.error('Get user data error:', error);
             return null;
         }
         return data;
     }
+
     // Update auth UI based on state
     updateAuthUI() {
         const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
         const logoutBtn = document.getElementById('logout-btn');
         const userStatus = document.getElementById('user-status');
+        
         if (this.currentUser) {
             if (loginBtn) loginBtn.style.display = 'none';
             if (logoutBtn) logoutBtn.style.display = 'inline-block';
@@ -1709,30 +1852,37 @@ class AuthManager {
             }
         }
     }
+
     // Show success message
     showSuccessMessage(message) {
         this.showMessage(message, 'success');
     }
+
     // Show error message
     showErrorMessage(message) {
         this.showMessage(message, 'error');
     }
+
     // Show info message
     showInfoMessage(message) {
         this.showMessage(message, 'info');
     }
+
     // Show message
     showMessage(message, type = 'info') {
         // Remove existing messages
         const existing = document.querySelector('.auth-message');
         if (existing) existing.remove();
+        
         // Create message element
         const messageDiv = document.createElement('div');
         messageDiv.className = `auth-message ${type}-message fade-in`;
         messageDiv.textContent = message;
+        
         // Add to DOM
         const authContainer = document.querySelector('.auth-container') || document.body;
         authContainer.prepend(messageDiv);
+        
         // Auto remove after 5 seconds
         setTimeout(() => {
             if (messageDiv.parentNode) {
@@ -1741,23 +1891,28 @@ class AuthManager {
         }, 5000);
     }
 }
+
 // Initialize auth manager
 const auth = new AuthManager();
+
 // Expose to window for debugging
 window.auth = auth;
+
 // Helper function to check auth state
 async function checkAuthState() {
-    const { data } = await supabase.auth.getSession();
+    const { data } = await window.supabaseClient.auth.getSession();
     auth.currentUser = data.session?.user || null;
     auth.updateAuthUI();
     return auth.currentUser;
 }
+
 // Load user data for dashboard
 async function loadUserData() {
     if (!auth.currentUser) {
         window.location.href = '../index.html';
         return;
     }
+    
     const userData = await auth.getUserData();
     if (userData) {
         // Update dashboard with user data
@@ -1765,19 +1920,23 @@ async function loadUserData() {
         userNameElements.forEach(el => {
             el.textContent = userData.name || userData.email.split('@')[0];
         });
+        
         document.getElementById('user-email').textContent = userData.email;
+        
         // Update avatar with initials
         const avatar = document.getElementById('user-avatar');
         if (avatar && userData.name) {
             const initials = userData.name.split(' ').map(n => n[0]).join('').toUpperCase();
             avatar.textContent = initials;
         }
+        
         // Update stats
         document.getElementById('meditation-streak').textContent = userData.meditation_streak || 0;
         document.getElementById('total-meditations').textContent = userData.total_meditations || 0;
         document.getElementById('journal-entries').textContent = userData.journal_entries || 0;
     }
 }
+
 // Check admin access
 async function checkAdminAccess() {
     const isAdmin = await auth.isAdmin();
@@ -1785,10 +1944,12 @@ async function checkAdminAccess() {
         window.location.href = '../index.html';
     }
 }
+
 // Logout function
 async function logout() {
     await auth.signOut();
 }
+
 // Add event listeners for logout buttons
 document.addEventListener('DOMContentLoaded', () => {
     // Logout button on index page
@@ -1796,11 +1957,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', logout);
     }
+    
     // Logout button on dashboard
     const dashboardLogout = document.getElementById('dashboard-logout');
     if (dashboardLogout) {
         dashboardLogout.addEventListener('click', logout);
     }
+    
     // Admin logout button
     const adminLogout = document.getElementById('admin-logout');
     if (adminLogout) {
@@ -2101,27 +2264,23 @@ class I18nManager {
         this.setupLanguageSwitcher();
     }
     async loadTranslations() {
-        // Try to load from localStorage first
-        const cached = localStorage.getItem(`translations_${this.currentLang}`);
-        if (cached) {
-            this.translations = JSON.parse(cached);
-            return;
+    // Always use embedded translations to avoid fetch errors
+    this.translations = this.getEmbeddedTranslations();
+    console.log(`Loaded embedded translations for ${this.currentLang}`);
+    // Optional: Try to fetch from server, but don't fail if it doesn't exist
+    try {
+        const response = await fetch(`translations/${this.currentLang}.json`);
+        if (response.ok) {
+            const serverTranslations = await response.json();
+            // Merge with embedded translations
+            this.translations = { ...this.translations, ...serverTranslations };
+            console.log(`Merged server translations for ${this.currentLang}`);
         }
-        // Load from external file or API
-        try {
-            const response = await fetch(`/translations/${this.currentLang}.json`);
-            if (response.ok) {
-                this.translations = await response.json();
-                localStorage.setItem(`translations_${this.currentLang}`, JSON.stringify(this.translations));
-            } else {
-                // Fallback to embedded translations
-                this.translations = this.getEmbeddedTranslations();
-            }
-        } catch (error) {
-            console.error('Failed to load translations:', error);
-            this.translations = this.getEmbeddedTranslations();
-        }
+    } catch (error) {
+        // Silently fail - we already have embedded translations
+        console.log(`Using embedded translations for ${this.currentLang}`);
     }
+}
     getEmbeddedTranslations() {
         // Embedded translations for English and Arabic
         return {
@@ -2762,7 +2921,7 @@ GOOGLE_ANALYTICS_ID=UA-XXXXXXXXX-X
       style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://cdnjs.cloudflare.com;
       font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
       img-src 'self' data: https:;
-      connect-src 'self' https://*.supabase.co https://*.netlify.app https://revdnghkdjfxuxiqjddk.supabase.co;
+      connect-src 'self' https://*.supabase.co https://*.netlify.app https://revdnghkdjfxuxiqjddk.supabase.co https://cdn.jsdelivr.net;
     """
 # Function configurations
 [functions]
@@ -2991,15 +3150,12 @@ CREATE POLICY "Admins have full access to content" ON content
 }
 ```
 ### 15. **js/init.js**
-
 ```javascript
 // Initialize everything in correct order
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing Atlantis...');
-    
     // Wait for Supabase to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
-    
     if (!window.supabaseClient) {
         console.error('❌ Supabase not initialized!');
         // Show error to user
@@ -3012,17 +3168,281 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.body.prepend(errorDiv);
     } else {
         console.log('✅ Supabase initialized successfully');
-        
         // Initialize auth
         if (window.auth) {
             await window.auth.init();
         }
-        
         // Initialize i18n
         if (window.i18n) {
             window.i18n.init();
         }
-        
         console.log('✅ Atlantis initialized successfully');
     }
 });
+**`translations/en.json`**:
+```json
+{
+    "site_name": "Atlantis",
+    "site_subtitle": "Spiritual Guidance",
+    "nav_home": "Home",
+    "nav_meditations": "Meditations",
+    "nav_wisdom": "Wisdom Library",
+    "nav_community": "Community",
+    "nav_login": "Login",
+    "nav_logout": "Logout",
+    "hero_title": "Find Your Inner Peace",
+    "hero_subtitle": "Journey through ancient wisdom and modern spiritual practices",
+    "hero_cta": "Begin Your Journey",
+    "features_title": "Our Spiritual Offerings",
+    "feature1_title": "Guided Meditations",
+    "feature1_desc": "Daily mindfulness sessions for inner peace",
+    "feature2_title": "Sacred Texts",
+    "feature2_desc": "Access to wisdom from spiritual traditions",
+    "feature3_title": "Community Circles",
+    "feature3_desc": "Connect with like-minded seekers",
+    "feature4_title": "Spiritual Growth Tracking",
+    "feature4_desc": "Monitor your spiritual journey",
+    "wisdom_title": "Wisdom of the Day",
+    "daily_wisdom": "\"The soul always knows what to do to heal itself. The challenge is to silence the mind.\"",
+    "wisdom_author": "— Caroline Myss",
+    "guest_message": "You are browsing as a guest. <a href=\"pages/login.html\">Login</a> for personalized guidance.",
+    "login_link": "Login",
+    "footer_tagline": "A sanctuary for spiritual growth",
+    "footer_quick_links": "Quick Links",
+    "footer_contact": "Contact",
+    "footer_email": "contact@atlantis-spiritual.com",
+    "footer_rights": "All rights reserved.",
+    "back_home": "Back Home",
+    "login_tab": "Login",
+    "signup_tab": "Sign Up",
+    "login_title": "Welcome Back, Seeker",
+    "email_label": "Email",
+    "password_label": "Password",
+    "login_button": "Login",
+    "forgot_password": "Forgot password?",
+    "reset_here": "Reset here",
+    "signup_title": "Begin Your Spiritual Journey",
+    "name_label": "Full Name",
+    "confirm_password_label": "Confirm Password",
+    "accept_terms": "I accept the Terms and Conditions",
+    "signup_button": "Create Account",
+    "reset_title": "Reset Password",
+    "reset_button": "Send Reset Link",
+    "back_to_login": "Back to Login",
+    "dashboard_home": "Dashboard",
+    "journal_title": "Spiritual Journal",
+    "progress_title": "Progress",
+    "settings_title": "Settings",
+    "dashboard_welcome": "Welcome,",
+    "dashboard_date": "Today is",
+    "daily_meditation_title": "Daily Meditation",
+    "recommended": "Recommended",
+    "morning_mindfulness": "Morning Mindfulness",
+    "meditation_duration": "10 minutes",
+    "view_all_meditations": "View All Meditations",
+    "today_journal_title": "Today's Journal",
+    "journal_placeholder": "Write your spiritual reflections here...",
+    "save_journal": "Save Entry",
+    "mood_label": "Today's Mood:",
+    "spiritual_progress": "Your Spiritual Progress",
+    "day_streak": "Day Streak",
+    "total_meditations": "Total Meditations",
+    "journal_entries": "Journal Entries",
+    "recent_wisdom_title": "Recent Wisdom"
+}
+```
+**`translations/ar.json`**:
+```json
+{
+    "site_name": "أتلانتس",
+    "site_subtitle": "الإرشاد الروحي",
+    "nav_home": "الرئيسية",
+    "nav_meditations": "التأملات",
+    "nav_wisdom": "مكتبة الحكمة",
+    "nav_community": "المجتمع",
+    "nav_login": "تسجيل الدخول",
+    "nav_logout": "تسجيل الخروج",
+    "hero_title": "ابحث عن سلامك الداخلي",
+    "hero_subtitle": "ارتحل عبر الحكمة القديمة والممارسات الروحية الحديثة",
+    "hero_cta": "ابدأ رحلتك",
+    "features_title": "عروضنا الروحية",
+    "feature1_title": "جلسات تأمل موجهة",
+    "feature1_desc": "جلسات يومية للوعي الكامل من أجل السلام الداخلي",
+    "feature2_title": "النصوص المقدسة",
+    "feature2_desc": "الوصول إلى الحكمة من التقاليد الروحية",
+    "feature3_title": "دوائر المجتمع",
+    "feature3_desc": "تواصل مع الباحثين عن المعنى",
+    "feature4_title": "تتبع النمو الروحي",
+    "feature4_desc": "راقب رحلتك الروحية",
+    "wisdom_title": "حكمة اليوم",
+    "daily_wisdom": "\"الروح تعرف دائمًا ما يجب فعله لشفاء نفسها. التحدي هو إسكات العقل.\"",
+    "wisdom_author": "— كارولين ميس",
+    "guest_message": "أنت تتصفح كضيف. <a href=\"pages/login.html\">سجل الدخول</a> للحصول على إرشادات مخصصة.",
+    "login_link": "تسجيل الدخول",
+    "footer_tagline": "ملاذ للنمو الروحي",
+    "footer_quick_links": "روابط سريعة",
+    "footer_contact": "اتصل بنا",
+    "footer_email": "contact@atlantis-spiritual.com",
+    "footer_rights": "جميع الحقوق محفوظة.",
+    "back_home": "العودة للرئيسية",
+    "login_tab": "تسجيل الدخول",
+    "signup_tab": "إنشاء حساب",
+    "login_title": "مرحبًا بعودتك، أيها الباحث",
+    "email_label": "البريد الإلكتروني",
+    "password_label": "كلمة المرور",
+    "login_button": "تسجيل الدخول",
+    "forgot_password": "نسيت كلمة المرور؟",
+    "reset_here": "إعادة تعيين هنا",
+    "signup_title": "ابدأ رحلتك الروحية",
+    "name_label": "الاسم الكامل",
+    "confirm_password_label": "تأكيد كلمة المرور",
+    "accept_terms": "أوافق على الشروط والأحكام",
+    "signup_button": "إنشاء حساب",
+    "reset_title": "إعادة تعيين كلمة المرور",
+    "reset_button": "إرسال رابط إعادة التعيين",
+    "back_to_login": "العودة لتسجيل الدخول",
+    "dashboard_home": "لوحة التحكم",
+    "journal_title": "المذكرات الروحية",
+    "progress_title": "التقدم",
+    "settings_title": "الإعدادات",
+    "dashboard_welcome": "مرحبًا،",
+    "dashboard_date": "اليوم هو",
+    "daily_meditation_title": "التأمل اليومي",
+    "recommended": "موصى به",
+    "morning_mindfulness": "اليقظة الصباحية",
+    "meditation_duration": "10 دقائق",
+    "view_all_meditations": "عرض كل التأملات",
+    "today_journal_title": "مذكرات اليوم",
+    "journal_placeholder": "اكتب تأملاتك الروحية هنا...",
+    "save_journal": "حفظ المدخل",
+    "mood_label": "مزاج اليوم:",
+    "spiritual_progress": "تقدمك الروحي",
+    "day_streak": "تتابع الأيام",
+    "total_meditations": "إجمالي التأملات",
+    "journal_entries": "مدخلات المذكرات",
+    "recent_wisdom_title": "الحكمة الحديثة"
+}
+**`js/admin.js`**:
+```javascript
+// Admin functions
+async function loadAdminData() {
+    try {
+        console.log('Loading admin data...');
+        // This would fetch real data from Supabase
+        // For now, simulate data
+        document.getElementById('total-users').textContent = '42';
+        document.getElementById('active-sessions').textContent = '15';
+        document.getElementById('total-content').textContent = '28';
+        // Simulate loading users table
+        const usersTableBody = document.querySelector('#users-table tbody');
+        if (usersTableBody) {
+            usersTableBody.innerHTML = `
+                <tr>
+                    <td>1</td>
+                    <td>John Doe</td>
+                    <td>john@example.com</td>
+                    <td>2024-01-01</td>
+                    <td><span class="status-active">Active</span></td>
+                    <td><button class="btn-sm">Edit</button></td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading admin data:', error);
+    }
+}
+async function checkAdminAccess() {
+    try {
+        if (!window.auth || !window.auth.currentUser) {
+            window.location.href = '../index.html';
+            return;
+        }
+        const isAdmin = await window.auth.isAdmin();
+        if (!isAdmin) {
+            window.location.href = '../index.html';
+        }
+    } catch (error) {
+        console.error('Error checking admin access:', error);
+        window.location.href = '../index.html';
+    }
+}
+async function addNewLanguage() {
+    const name = document.getElementById('new-language-name').value;
+    const code = document.getElementById('new-language-code').value;
+    if (!name || !code) {
+        alert('Please enter both language name and code');
+        return;
+    }
+    if (window.i18n) {
+        // This would normally save to Supabase
+        alert(`Language ${name} (${code}) added successfully!`);
+        document.getElementById('new-language-name').value = '';
+        document.getElementById('new-language-code').value = '';
+    } else {
+        alert('i18n not initialized');
+    }
+}
+// Make functions available globally
+window.loadAdminData = loadAdminData;
+window.checkAdminAccess = checkAdminAccess;
+window.addNewLanguage = addNewLanguage;
+window.logout = window.auth ? window.auth.signOut : () => {};
+
+supabase updated:
+-- First, disable RLS temporarily to fix the structure
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+
+-- Drop existing problematic policies
+DROP POLICY IF EXISTS "Users can insert own profile" ON users;
+DROP POLICY IF EXISTS "Users can view own data" ON users;
+DROP POLICY IF EXISTS "Users can update own data" ON users;
+DROP POLICY IF EXISTS "Service role can do everything" ON users;
+
+-- Re-enable RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- Create new, simpler policies for the users table
+-- Allow users to insert their own profile (this is key for signup)
+CREATE POLICY "Users can insert own profile" ON users
+    FOR INSERT 
+    WITH CHECK (auth.uid() = id);
+
+-- Allow users to read their own data
+CREATE POLICY "Users can read own data" ON users
+    FOR SELECT 
+    USING (auth.uid() = id);
+
+-- Allow users to update their own data
+CREATE POLICY "Users can update own data" ON users
+    FOR UPDATE 
+    USING (auth.uid() = id);
+
+-- Allow service role (admin functions) to do everything
+CREATE POLICY "Service role full access" ON users
+    FOR ALL 
+    USING (auth.role() = 'service_role');
+
+-- Add similar policies for journal_entries
+ALTER TABLE journal_entries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own journal entries" ON journal_entries
+    FOR ALL 
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- Fix content table policies too
+ALTER TABLE content DISABLE ROW LEVEL SECURITY;
+ALTER TABLE content ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Everyone can view published content" ON content
+    FOR SELECT 
+    USING (published = true);
+
+CREATE POLICY "Admins can manage content" ON content
+    FOR ALL 
+    USING (EXISTS (
+        SELECT 1 FROM users 
+        WHERE users.id = auth.uid() 
+        AND users.role = 'admin'
+    ));

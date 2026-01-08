@@ -63,6 +63,9 @@ class AuthManager {
     // Sign up new user
     async signUp(email, password, name) {
     try {
+        console.log('Starting signup for:', email);
+        
+        // First, sign up with Supabase Auth
         const { data, error } = await this.supabase.auth.signUp({
             email,
             password,
@@ -71,39 +74,77 @@ class AuthManager {
                     name: name,
                     created_at: new Date().toISOString()
                 },
-                emailRedirectTo: `${window.location.origin}/pages/login.html`
+                // Use Netlify URL if available, otherwise localhost for testing
+                emailRedirectTo: window.location.hostname.includes('netlify.app') 
+                    ? `${window.location.origin}/pages/login.html`
+                    : 'http://localhost:8888/pages/login.html'
             }
         });
         
-        if (error) throw error;
+        if (error) {
+            console.error('Auth signup error:', error);
+            throw error;
+        }
         
-        // IMPORTANT: Wait a moment for auth to fully register
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('Auth signup successful, user:', data.user);
         
-        // Now create user profile - but check if we're authenticated first
+        // IMPORTANT: Sign in immediately after signup to get session
+        const { data: signInData, error: signInError } = await this.supabase.auth.signInWithPassword({
+            email,
+            password
+        });
+        
+        if (signInError) {
+            console.error('Auto signin error:', signInError);
+            // Continue anyway - user can verify email later
+        } else {
+            console.log('Auto signin successful');
+            this.currentUser = signInData.user;
+        }
+        
+        // Create user profile - but only if we have a session
         if (data.user) {
             await this.createUserProfile(data.user, name);
         }
         
-        return { success: true, data };
+        return { 
+            success: true, 
+            data,
+            message: data.user?.identities?.length === 0 
+                ? 'Please check your email to confirm your account before logging in.'
+                : 'Account created successfully!'
+        };
     } catch (error) {
         console.error('Sign up error:', error);
-        return { success: false, error: error.message };
+        return { 
+            success: false, 
+            error: error.message,
+            code: error.code
+        };
     }
 }
 
-// Also update createUserProfile:
 async createUserProfile(user, name) {
     try {
-        // Get the current session to ensure we have a token
+        console.log('Creating user profile for:', user.id);
+        
+        // Get current session to ensure we have a token
         const { data: { session } } = await this.supabase.auth.getSession();
         
         if (!session) {
-            console.error('No session found, cannot create profile');
-            return;
+            console.log('No session found, waiting for auth state...');
+            // Wait a bit and try again
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const { data: { session: retrySession } } = await this.supabase.auth.getSession();
+            if (!retrySession) {
+                console.warn('Still no session after waiting. User may need to confirm email first.');
+                return;
+            }
         }
         
-        const { error } = await this.supabase
+        // Try to insert the user profile
+        const { data, error } = await this.supabase
             .from('users')
             .insert([
                 {
@@ -116,38 +157,36 @@ async createUserProfile(user, name) {
                     journal_entries: 0,
                     role: 'user'
                 }
-            ]);
+            ])
+            .select();  // Add .select() to get feedback
             
         if (error) {
-            console.error('Profile creation error:', error);
-            // Don't throw, just log - the user can still use the app
-            // They can complete profile setup later
+            console.error('Profile creation error details:', error);
+            
+            // If it's a duplicate key error, that's okay - profile already exists
+            if (error.code === '23505') {
+                console.log('User profile already exists, that\'s fine');
+                return;
+            }
+            
+            // For RLS errors, we might need to use a different approach
+            if (error.code === '42501') {
+                console.warn('RLS policy prevented insertion. This may be okay if user needs to confirm email first.');
+                // Schedule a retry for later
+                setTimeout(() => this.createUserProfile(user, name), 5000);
+                return;
+            }
+            
+            throw error;
         }
+        
+        console.log('Profile created successfully:', data);
     } catch (error) {
         console.error('Error in createUserProfile:', error);
+        // Don't throw - let signup continue even if profile creation fails
+        // The user can complete profile setup later
     }
 }
-
-    // Create user profile
-    async createUserProfile(user, name) {
-        const { error } = await this.supabase
-            .from('users')
-            .insert([
-                {
-                    id: user.id,
-                    email: user.email,
-                    name: name,
-                    created_at: new Date().toISOString(),
-                    meditation_streak: 0,
-                    total_meditations: 0,
-                    journal_entries: 0
-                }
-            ]);
-            
-        if (error) {
-            console.error('Profile creation error:', error);
-        }
-    }
 
     // Sign in user
     async signIn(email, password) {
