@@ -1,7 +1,6 @@
 // Supabase configuration
 const SUPABASE_URL = 'https://revdnghkdjfxuxiqjddk.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 
-  (typeof window !== 'undefined' ? window.SUPABASE_ANON_KEY : '');
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldmRuZ2hrZGpmeHV4aXFqZGRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NjkzMTcsImV4cCI6MjA4MzM0NTMxN30.ytyzor-EvXbZ67NkC_o9Jaj5CH4dk3iVqxM411Xf5X4'
 
 // Initialize Supabase client only once
 if (!window.supabaseClient) {
@@ -57,4 +56,5 @@ if (!window.supabaseClient) {
             update: () => ({ eq: () => Promise.reject(new Error('Supabase not initialized')) })
         })
     };
+
 }
