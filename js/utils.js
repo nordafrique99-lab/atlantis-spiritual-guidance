@@ -140,7 +140,23 @@ translate(key, defaultText = '') {
             "welcome_user": "Welcome back, ",
             "default_error": "An error occurred. Please try again.",
             "validation_error": "Validation error",
-            "unknown_error": "Unknown error occurred"
+            "unknown_error": "Unknown error occurred",
+"reset_request_title": "Reset Your Password",
+"reset_request_subtitle": "Enter your email address and we'll send you a link to reset your password.",
+"send_reset_link": "Send Reset Link",
+"set_new_password_title": "Set New Password",
+"set_new_password_subtitle": "Please enter your new password below.",
+"new_password_label": "New Password",
+"confirm_new_password_label": "Confirm New Password",
+"update_password": "Update Password",
+"reset_success_title": "Password Reset Successful!",
+"reset_success_message": "Your password has been successfully reset. You can now log in with your new password.",
+"go_to_login": "Go to Login",
+"sending": "Sending...",
+"updating": "Updating...",
+"reset_email_sent": "Password reset email sent! Check your inbox.",
+"reset_request_failed": "Failed to send reset email. Please try again.",
+"password_update_failed": "Failed to update password. Please try again."
             },
             ar: {
                 "site_name": "أتلانتس",
@@ -238,7 +254,23 @@ translate(key, defaultText = '') {
             "welcome_user": "مرحبًا بعودتك، ",
             "default_error": "حدث خطأ. يرجى المحاولة مرة أخرى.",
             "validation_error": "خطأ في التحقق",
-            "unknown_error": "حدث خطأ غير معروف"
+            "unknown_error": "حدث خطأ غير معروف",
+"reset_request_title": "إعادة تعيين كلمة المرور",
+"reset_request_subtitle": "أدخل عنوان بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.",
+"send_reset_link": "إرسال رابط إعادة التعيين",
+"set_new_password_title": "تعيين كلمة مرور جديدة",
+"set_new_password_subtitle": "يرجى إدخال كلمة المرور الجديدة أدناه.",
+"new_password_label": "كلمة المرور الجديدة",
+"confirm_new_password_label": "تأكيد كلمة المرور الجديدة",
+"update_password": "تحديث كلمة المرور",
+"reset_success_title": "تم إعادة تعيين كلمة المرور بنجاح!",
+"reset_success_message": "تم إعادة تعيين كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول باستخدام كلمة المرور الجديدة.",
+"go_to_login": "الذهاب لتسجيل الدخول",
+"sending": "جاري الإرسال...",
+"updating": "جاري التحديث...",
+"reset_email_sent": "تم إرسال بريد إعادة تعيين كلمة المرور! تحقق من بريدك الوارد.",
+"reset_request_failed": "فشل إرسال بريد إعادة التعيين. يرجى المحاولة مرة أخرى.",
+"password_update_failed": "فشل تحديث كلمة المرور. يرجى المحاولة مرة أخرى."
             }
         }[this.currentLang] || {};
     }

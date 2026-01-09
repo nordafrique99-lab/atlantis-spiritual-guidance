@@ -36,14 +36,14 @@ class AuthManager {
         // Initial UI update
         this.updateAuthUI();
 	}
-
-// Add a translation helper method to AuthManager class
-translate(key, defaultText = '') {
-    if (window.i18n && window.i18n.translate) {
-        return window.i18n.translate(key, defaultText);
-    }
-    return defaultText || key;
-}
+	
+	// Add a translation helper method to AuthManager class
+	translate(key, defaultText = '') {
+		if (window.i18n && window.i18n.translate) {
+			return window.i18n.translate(key, defaultText);
+		}
+		return defaultText || key;
+	}
 	
     // Sign up new user - NO EMAIL CONFIRMATION NEEDED
     async signUp(email, password, name) {
@@ -228,27 +228,27 @@ translate(key, defaultText = '') {
 	
     // Update auth UI
     updateAuthUI() {
-    const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
-    const logoutBtn = document.getElementById('logout-btn');
-    const userStatus = document.getElementById('user-status');
-    
-    if (this.currentUser) {
-        if (loginBtn) loginBtn.style.display = 'none';
-        if (logoutBtn) logoutBtn.style.display = 'inline-block';
-        if (userStatus) {
-            // Use translation for welcome message
-            const welcomeMessage = window.t('welcome_user', 'Welcome back, ') + this.currentUser.email;
-            userStatus.innerHTML = `<p>${welcomeMessage}</p>`;
-        }
-    } else {
-        if (loginBtn) loginBtn.style.display = 'inline-block';
-        if (logoutBtn) logoutBtn.style.display = 'none';
-        if (userStatus) {
-            // Use translation key for guest message
-            userStatus.innerHTML = `<p>${window.t('guest_message', 'You are browsing as a guest. <a href="pages/login.html">Login</a> for personalized guidance.')}</p>`;
-        }
-    }
-}
+		const loginBtn = document.querySelector('.nav-auth a[href*="login"]');
+		const logoutBtn = document.getElementById('logout-btn');
+		const userStatus = document.getElementById('user-status');
+		
+		if (this.currentUser) {
+			if (loginBtn) loginBtn.style.display = 'none';
+			if (logoutBtn) logoutBtn.style.display = 'inline-block';
+			if (userStatus) {
+				// Use translation for welcome message
+				const welcomeMessage = window.t('welcome_user', 'Welcome back, ') + this.currentUser.email;
+				userStatus.innerHTML = `<p>${welcomeMessage}</p>`;
+			}
+			} else {
+			if (loginBtn) loginBtn.style.display = 'inline-block';
+			if (logoutBtn) logoutBtn.style.display = 'none';
+			if (userStatus) {
+				// Use translation key for guest message
+				userStatus.innerHTML = `<p>${window.t('guest_message', 'You are browsing as a guest. <a href="pages/login.html">Login</a> for personalized guidance.')}</p>`;
+			}
+		}
+	}
 	
     // Show message functions (keep as is)
     showSuccessMessage(message) {
@@ -264,44 +264,88 @@ translate(key, defaultText = '') {
 	}
 	
     showMessage(message, type = 'info') {
-    // Check if message is a translation key
-    let displayMessage;
-    
-    if (window.t && typeof window.t === 'function') {
-        // Try to translate the message
-        displayMessage = window.t(message, message);
-    } else if (window.i18n && window.i18n.translate) {
-        // Fallback to i18n instance
-        displayMessage = window.i18n.translate(message, message);
-    } else {
-        // Use message as-is
-        displayMessage = message;
-    }
-    
-    const existing = document.querySelector('.auth-message');
-    if (existing) existing.remove();
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `auth-message ${type}-message fade-in`;
-    
-    // Check if it contains HTML
-    if (displayMessage.includes('<') && displayMessage.includes('>')) {
-        messageDiv.innerHTML = displayMessage;
-    } else {
-        messageDiv.textContent = displayMessage;
-    }
-    
-    const authContainer = document.querySelector('.auth-container') || 
-                          document.querySelector('.container') || 
-                          document.body;
-    authContainer.prepend(messageDiv);
-    
-    setTimeout(() => {
-        if (messageDiv.parentNode) {
-            messageDiv.remove();
-        }
-    }, 5000);
-}
+		// Check if message is a translation key
+		let displayMessage;
+		
+		if (window.t && typeof window.t === 'function') {
+			// Try to translate the message
+			displayMessage = window.t(message, message);
+			} else if (window.i18n && window.i18n.translate) {
+			// Fallback to i18n instance
+			displayMessage = window.i18n.translate(message, message);
+			} else {
+			// Use message as-is
+			displayMessage = message;
+		}
+		
+		const existing = document.querySelector('.auth-message');
+		if (existing) existing.remove();
+		
+		const messageDiv = document.createElement('div');
+		messageDiv.className = `auth-message ${type}-message fade-in`;
+		
+		// Check if it contains HTML
+		if (displayMessage.includes('<') && displayMessage.includes('>')) {
+			messageDiv.innerHTML = displayMessage;
+			} else {
+			messageDiv.textContent = displayMessage;
+		}
+		
+		const authContainer = document.querySelector('.auth-container') || 
+		document.querySelector('.container') || 
+		document.body;
+		authContainer.prepend(messageDiv);
+		
+		setTimeout(() => {
+			if (messageDiv.parentNode) {
+				messageDiv.remove();
+			}
+		}, 5000);
+	}
+	
+	// Request password reset
+	async requestPasswordReset(email) {
+		try {
+			const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+				redirectTo: `${window.location.origin}/pages/reset-password.html`,
+			});
+			
+			if (error) {
+				console.error('Password reset request error:', error);
+				throw error;
+			}
+			
+			return { success: true };
+			} catch (error) {
+			console.error('Password reset request failed:', error);
+			return { 
+				success: false, 
+				error: error.message || 'Failed to send reset email' 
+			};
+		}
+	}
+	
+	// Update password (after clicking reset link)
+	async updatePassword(newPassword) {
+		try {
+			const { error } = await this.supabase.auth.updateUser({
+				password: newPassword
+			});
+			
+			if (error) {
+				console.error('Update password error:', error);
+				throw error;
+			}
+			
+			return { success: true };
+			} catch (error) {
+			console.error('Update password failed:', error);
+			return { 
+				success: false, 
+				error: error.message || 'Failed to update password' 
+			};
+		}
+	}
 }
 
 // Initialize auth manager
