@@ -37,7 +37,7 @@ class AuthManager {
         this.updateAuthUI();
 	}
 	
-	// Add a translation helper method to AuthManager class
+	// translation helper
 	translate(key, defaultText = '') {
 		if (window.i18n && window.i18n.translate) {
 			return window.i18n.translate(key, defaultText);
@@ -139,18 +139,28 @@ class AuthManager {
 	
     // Reset password
     async resetPassword(email) {
-        try {
-            const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/pages/reset-password.html`,
-			});
-            
-            if (error) throw error;
-            return { success: true };
-			} catch (error) {
-            console.error('Reset password error:', error);
-            return { success: false, error: error.message };
-		}
-	}
+    try {
+        // Get the current origin (domain)
+        const currentOrigin = window.location.origin;
+        
+        const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${currentOrigin}/pages/reset-password.html`,
+        });
+        
+        if (error) {
+            console.error('Password reset request error:', error);
+            throw error;
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Password reset request failed:', error);
+        return { 
+            success: false, 
+            error: error.message || 'Failed to send reset email' 
+        };
+    }
+}
 	
     // Check if user is admin
     async isAdmin() {
@@ -324,6 +334,22 @@ class AuthManager {
 			};
 		}
 	}
+async setSessionFromToken(accessToken, refreshToken) {
+    try {
+        const { data, error } = await this.supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+        });
+        
+        if (error) throw error;
+        
+        this.currentUser = data.session?.user || null;
+        return { success: true };
+    } catch (error) {
+        console.error('Set session error:', error);
+        return { success: false, error: error.message };
+    }
+}
 	
 	// Update password (after clicking reset link)
 	async updatePassword(newPassword) {
